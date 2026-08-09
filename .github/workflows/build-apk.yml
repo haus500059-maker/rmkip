@@ -12,21 +12,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Сборка внутри официального образа kivy/buildozer:
-      # команда Kivy держит в нём совместимый набор buildozer + python-for-android + NDK,
-      # это убирает ошибки «пляски версий» на хост-окружении.
+      # Сборка внутри официального образа kivy/buildozer.
+      # Проблема: встроенный в образ buildozer старый python-for-android (2022)
+      # делает в venv «pip install -U pip», а свежая pip 26.x при апгрейте
+      # оставляет смешанное состояние (новый installer.py + старый exceptions.py)
+      # и падает с ImportError: BuildDependencyInstallError. Это исправлено
+      # в p4a (develop) отказом от self-upgrade. Поэтому после «android update»
+      # патчим локальный p4a той же правкой (заменяем апгрейд pip на no-op «true»),
+      # затем собираем APK.
       - name: Build debug APK
         run: |
           docker pull kivy/buildozer:latest
-          # Переопределяем entrypoint, чтобы сначала починить битый pip базового окружения
-          # (иначе p4a падает в venv с ImportError: BuildDependencyInstallError),
-          # затем запускаем штатную сборку.
           docker run --rm \
             -v "${{ github.workspace }}":/app \
             -w /app \
             --entrypoint /bin/bash \
             kivy/buildozer:latest \
-            -c "python -m ensurepip --upgrade --default-pip && buildozer android debug"
+            -c "buildozer android update && sed -i 's/source venv\/bin\/activate && pip install -U pip/true/' /app/.buildozer/android/platform/python-for-android/pythonforandroid/build.py && buildozer android debug"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
