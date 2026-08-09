@@ -18,12 +18,15 @@ jobs:
       - name: Build debug APK
         run: |
           docker pull kivy/buildozer:latest
-          # Entrypoint образа сам вызывает buildozer, поэтому команда — «android debug» напрямую
+          # Переопределяем entrypoint, чтобы сначала починить битый pip базового окружения
+          # (иначе p4a падает в venv с ImportError: BuildDependencyInstallError),
+          # затем запускаем штатную сборку.
           docker run --rm \
             -v "${{ github.workspace }}":/app \
             -w /app \
+            --entrypoint /bin/bash \
             kivy/buildozer:latest \
-            android debug
+            -c "python -m ensurepip --upgrade --default-pip && buildozer android debug"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
