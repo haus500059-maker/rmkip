@@ -39,4 +39,6 @@ ios.codesign.debug = automatic
 
 # Многопоточная загрузка SDK/NDK и выходных файлов
 log_level = 2
-warn_on_root = 1
+# В контейнере сборка идёт под root — отключаем интерактивный вопрос,
+# который падал с EOFError (нет stdin)
+warn_on_root = 0
