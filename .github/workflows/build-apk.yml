@@ -18,11 +18,12 @@ jobs:
       - name: Build debug APK
         run: |
           docker pull kivy/buildozer:latest
+          # Entrypoint образа сам вызывает buildozer, поэтому команда — «android debug» напрямую
           docker run --rm \
             -v "${{ github.workspace }}":/app \
             -w /app \
             kivy/buildozer:latest \
-            python3 -m buildozer -v android debug
+            android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
