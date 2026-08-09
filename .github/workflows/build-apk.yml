@@ -19,6 +19,11 @@ jobs:
             git zip unzip wget openjdk-17-jdk \
             autoconf libtool pkg-config zlib1g-dev libncurses-dev \
             libffi-dev libssl-dev python3-pip python3-setuptools
+          # Ubuntu 24.04 убрал libncurses5 — без неё падает aapt2 (Android SDK)
+          wget -q http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2_amd64.deb
+          sudo dpkg -i libtinfo5_6.3-2_amd64.deb
+          wget -q http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses/libncurses5_6.3-2_amd64.deb
+          sudo dpkg -i libncurses5_6.3-2_amd64.deb
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,7 +32,7 @@ jobs:
 
       - name: Install buildozer
         run: |
-          pip3 install --upgrade buildozer Cython virtualenv
+          pip3 install --upgrade "buildozer==1.5.0" "Cython<3" virtualenv
 
       - name: Build debug APK
         run: |
