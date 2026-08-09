@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.buildozer/
+bin/
+dist/
+build/
+*.log
+desktop_test_log.txt
+*.spec.bak
+.idea/
+.vscode/
