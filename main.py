@@ -11,6 +11,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.label import Label
+from kivy.uix.image import Image
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.spinner import Spinner
@@ -114,6 +115,17 @@ def make_label(text, size=17, bold=False, color=TEXT, halign="left",
                valign="middle", wrap=None, height=40):
     if wrap is None:
         wrap = max(120, len(str(text)) * (size + 6))
+        lbl = Label(
+            text=text, font_size=sc(size), bold=bold, color=color,
+            halign=halign, valign=valign,
+            size_hint_y=None, height=sc(height),
+        )
+        # Привязка переноса к фактической ширине виджета: текст не вылезает за края.
+        def _fit(_w=None, _h=None):
+            lbl.text_size = (lbl.width, None)
+        lbl.bind(width=_fit)
+        lbl.text_size = (lbl.width, None)
+        return lbl
     return Label(
         text=text, font_size=sc(size), bold=bold, color=color,
         halign=halign, valign=valign,
@@ -166,7 +178,10 @@ def make_spinner(values, index=0, size=17, height=48):
 
 
 def make_row(height=None):
-    return BoxLayout(orientation="horizontal", spacing=sc(8), padding=(0, sc(2)))
+    r = BoxLayout(orientation="horizontal", spacing=sc(8), padding=(0, sc(2)),
+                  size_hint_y=None)
+    r.bind(minimum_height=r.setter("height"))
+    return r
 
 
 def as_scroll(widget):
@@ -201,15 +216,16 @@ def field(content, caption, input_widget=None, hint="", cap_size=13, height=74):
 
 
 def pair_grid(content, cols, cells):
-    """Сетка из N колонок; в каждой ячейке подпись над контролом (полная ширина)."""
+    """Сетка из N колонок; в каждой ячейке подпись над контролом (полная ширина).
+    Высота ячеек и сетки авто-подстраивается под перенос подписей."""
     g = GridLayout(cols=cols, size_hint_y=None, spacing=sc(10))
     for caption, widget in cells:
         b = BoxLayout(orientation="vertical", size_hint_y=None, spacing=sc(4))
         b.add_widget(cap_label(caption, size=12))
         b.add_widget(widget)
-        b.height = sc(74)
+        b.bind(minimum_height=b.setter("height"))
         g.add_widget(b)
-    g.height = sc(80)
+    g.bind(minimum_height=g.setter("height"))
     content.add_widget(g)
     return g
 
@@ -225,8 +241,9 @@ def popup(title, msg, kind="info"):
     body.add_widget(btn)
     content = BoxLayout(orientation="vertical", padding=sc(18), spacing=sc(10))
     content.add_widget(body)
-    p = Popup(title=f"[b]{title}[/b]", content=content,
-              size_hint=(0.88, None), height=sc(340), auto_dismiss=True, title_color=PRIMARY)
+    p = Popup(title=title, content=content,
+              size_hint=(0.88, None), height=sc(340), auto_dismiss=True,
+              title_size=sc(17), title_align="center", title_color=cl)
     btn.bind(on_press=p.dismiss)
     p.open()
 
@@ -234,6 +251,14 @@ def popup(title, msg, kind="info"):
 def copy_text(text):
     Clipboard.copy(text)
     popup("Скопировано", "Текст помещён в буфер обмена.", "ok")
+
+
+def copy_result(lbl):
+    """Копирует текст результата, если он есть; иначе подсказывает выполнить расчёт."""
+    if lbl is None or not str(lbl.text).strip():
+        popup("Нет результата", "Сначала выполните расчёт, затем копируйте.", "warn")
+        return
+    copy_text(lbl.text)
 
 
 # ----------------------------------------------------------------------
@@ -251,13 +276,15 @@ def wrap_screen(scr, title, content):
     outer = BoxLayout(orientation="vertical")
     paint_bg(outer, BG)
     bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=sc(56),
-                    padding=(sc(10), sc(6)), spacing=sc(10))
+                    padding=(sc(6), sc(6)), spacing=sc(8))
     paint_bg(bar, PANEL)
     back = Button(text="‹ Меню", font_size=sc(16), background_color=PRIMARY,
-                  size_hint_x=None, width=sc(110))
+                  size_hint_x=None)
     back.bind(on_press=lambda *_a: setattr(scr.manager, "current", "menu"))
     bar.add_widget(back)
-    bar.add_widget(make_label(title, size=17, bold=True, color=PRIMARY))
+    tl = make_label(title, size=17, bold=True, color=PRIMARY, height=sc(44))
+    tl.halign = "center"
+    bar.add_widget(tl)
     outer.add_widget(bar)
     outer.add_widget(as_scroll(content))
     scr.add_widget(outer)
@@ -285,7 +312,7 @@ class ConvScreen(Screen):
         content.add_widget(btn)
         self.l_res = make_result_area(content)
         content.add_widget(self.l_res)
-        b2 = make_button("Копировать результат", lambda *_: copy_text(self.l_res.text),
+        b2 = make_button("Копировать результат", lambda *_: copy_result(self.l_res),
                          bg=(0.42, 0.447, 0.502, 1), height=46)
         content.add_widget(b2)
 
@@ -456,7 +483,7 @@ class DiagScreen(Screen):
         content.add_widget(b1)
         self.l_diag = make_result_area(content)
         content.add_widget(self.l_diag)
-        b2 = make_button("Копировать фрагмент акта", lambda *_: copy_text(self.l_diag.text),
+        b2 = make_button("Копировать фрагмент акта", lambda *_: copy_result(self.l_diag),
                          bg=(0.42, 0.447, 0.502, 1), height=46)
         content.add_widget(b2)
 
@@ -599,10 +626,8 @@ class TempScreen(Screen):
         self.e_tt_points = make_input(); self.e_tt_points.text = "0,25,50,75,100"
         pair_grid(content, 2, [("Кл. точности, %", self.e_tt_acc),
                                ("Точки, % (через запятую)", self.e_tt_points)])
-        td0 = make_row()
-        td0.add_widget(make_button("Сформировать таблицу", self.on_tt_gen, height=46))
-        td0.add_widget(make_button("Проверить точки", self.on_tt_check, bg=SUCCESS, height=46))
-        content.add_widget(td0)
+        content.add_widget(make_button("Сформировать таблицу", self.on_tt_gen, height=46))
+        content.add_widget(make_button("Проверить точки", self.on_tt_check, bg=SUCCESS, height=46))
         self.tt_tbl = GridLayout(cols=6, size_hint_y=None, spacing=sc(4))
         self.tt_tbl.bind(minimum_height=self.tt_tbl.setter("height"))
         content.add_widget(self.tt_tbl)
@@ -764,10 +789,8 @@ class TCScreen(Screen):
         self.e_points = make_input(); self.e_points.text = "0,25,50,75,100"
         pair_grid(content, 2, [("Допуск, °C", self.e_tol),
                                ("Точки, % (через запятую)", self.e_points)])
-        td = make_row()
-        td.add_widget(make_button("Сформировать таблицу", self.on_tc_gen, height=46))
-        td.add_widget(make_button("Проверить точки", self.on_tc_check, bg=SUCCESS, height=46))
-        content.add_widget(td)
+        content.add_widget(make_button("Сформировать таблицу", self.on_tc_gen, height=46))
+        content.add_widget(make_button("Проверить точки", self.on_tc_check, bg=SUCCESS, height=46))
         self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=sc(4))
         self.tbl.bind(minimum_height=self.tbl.setter("height"))
         content.add_widget(self.tbl)
@@ -910,7 +933,7 @@ class OrifScreen(Screen):
         content.add_widget(make_button("РАССЧИТАТЬ РАСХОД", self.on_calc))
         self.l_res = make_result_area(content)
         content.add_widget(self.l_res)
-        content.add_widget(make_button("Копировать результат", lambda *_: copy_text(self.l_res.text),
+        content.add_widget(make_button("Копировать результат", lambda *_: copy_result(self.l_res),
                                        bg=(0.42, 0.447, 0.502, 1), height=46))
 
         wrap_screen(self, "Расход (диафрагма)", content)
@@ -1005,6 +1028,45 @@ class OrifScreen(Screen):
 
 
 # ----------------------------------------------------------------------
+# ЭКРАН 7. О программе
+# ----------------------------------------------------------------------
+class AboutScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        content = new_scroll()
+
+        content.add_widget(make_label("Расчётный модуль КИПиА", size=22, bold=True,
+                                      color=PRIMARY))
+        content.add_widget(make_label("Версия 1.0", size=14, color=MUTED))
+
+        self.l_about_1 = make_result_area(content)
+        content.add_widget(self.l_about_1)
+        self.l_about_1.text = (
+            "Программа предназначена для специалистов КИПиА, метрологов и инженеров, "
+            "которым ежедневно приходится выполнять быстрые и точные расчёты при поверке, "
+            "диагностике и эксплуатации средств измерений.")
+
+        heading(content, "Возможности")
+        self.l_about_2 = make_result_area(content)
+        content.add_widget(self.l_about_2)
+        self.l_about_2.text = (
+            "• Конвертация единиц давления и расчёт погрешности\n"
+            "• Расход по квадратичной зависимости (шкала и сигнал)\n"
+            "• Диагностика датчиков и мини-протокол поверки\n"
+            "• Термометры сопротивления: НСХ, R ↔ t, таблицы поверки\n"
+            "• Термопары: НСХ, ЭДС ↔ t, таблицы поверки\n"
+            "• Расход через диафрагму по ГОСТ 8.586.2 / ISO 5167")
+
+        self.l_about_3 = make_result_area(content)
+        content.add_widget(self.l_about_3)
+        self.l_about_3.text = (
+            "Приложение написано на языке Python (фреймворк Kivy).\n\n"
+            "Автор: Евгений Харлин\nГод: 2026")
+
+        wrap_screen(self, "О программе", content)
+
+
+# ----------------------------------------------------------------------
 # Главный экран — меню модулей
 # ----------------------------------------------------------------------
 MENU_ITEMS = [
@@ -1014,6 +1076,7 @@ MENU_ITEMS = [
     ("Температура (НСХ)", TempScreen),
     ("Термопары (НСХ)", TCScreen),
     ("Расход (диафрагма)", OrifScreen),
+    ("О программе", AboutScreen),
 ]
 
 
@@ -1022,8 +1085,14 @@ class MenuScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
         paint_bg(self, BG)
-        content.add_widget(make_label("Расчётный модуль КИПиА", size=26, bold=True,
-                                      color=PRIMARY))
+        t = auto_area("Расчётный модуль КИПиА", size=25, color=PRIMARY)
+        t.bold = True
+        t.halign = "center"
+        content.add_widget(t)
+        logo = Image(source="logo_gauge.png", size_hint=(None, None),
+                     size=(sc(160), sc(160)))
+        logo.pos_hint = {"center_x": 0.5}
+        content.add_widget(logo)
         content.add_widget(make_label("Выберите раздел:", size=16, color=MUTED))
         for name, _cls in MENU_ITEMS:
             b = make_button(name, bg=PRIMARY, height=58)

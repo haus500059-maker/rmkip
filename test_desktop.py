@@ -44,7 +44,7 @@ def drive(dt):
     try:
         app = App.get_running_app()
         sm = app.root
-        check("screens==7", len(sm.screen_names) == 7, str(sm.screen_names))
+        check("screens==8", len(sm.screen_names) == 8, str(sm.screen_names))
 
         # ---------- 1. Конвертация ----------
         s = sm.get_screen("scr_Конвертация и погрешность")
@@ -160,6 +160,12 @@ def drive(dt):
         s.s_media.text = "вода"
         s.on_media()
         check("orif back to water clears gas", s.e_kappa.text == "" and s.e_p1.text == "", (s.e_kappa.text, s.e_p1.text))
+
+        # ---------- 7. О программе ----------
+        s = sm.get_screen("scr_О программе")
+        check("about mention КИПиА", "КИПиА" in s.l_about_1.text, s.l_about_1.text)
+        check("about 6 features", "диафрагму" in s.l_about_2.text, s.l_about_2.text)
+        check("about author+python+year", "Python" in s.l_about_3.text and "Евгений Харлин" in s.l_about_3.text and "2026" in s.l_about_3.text, s.l_about_3.text)
 
         log("====== DONE ======")
     except Exception as e:
