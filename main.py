@@ -35,6 +35,38 @@ def sc(v):
         return float(v)
     return float(v) * (w / DESIGN_WIDTH_DP)
 
+
+def safe_insets_px():
+    """Высоты системных зон (верх/низ) в px на Android; вне Android — (0, 0).
+    Нужны в полноэкранном режиме, чтобы контент не прятался под вырезом
+    камеры (сверху) и под зоной жестов/кнопок навигации (снизу)."""
+    top = bottom = 0
+    try:
+        from kivy.utils import platform
+        if platform != "android":
+            return 0, 0
+        from jnius import autoclass
+        activity = autoclass("org.kivy.android.PythonActivity").mActivity
+        resources = activity.getResources()
+        def _dimen(name):
+            ident = resources.getIdentifier(name, "dimen", "android")
+            return resources.getDimensionPixelSize(ident) if ident else 0
+        top = _dimen("status_bar_height")
+        bottom = _dimen("navigation_bar_height")
+    except Exception:
+        top = bottom = 0
+    return top, bottom
+
+
+def add_safe_spacers(outer, top=True, bottom=True):
+    """Вставляет в вертикальный BoxLayout пустые «прокладки» под системные зоны,
+    чтобы контент не заходил под камеру (вырез) сверху и под зону жестов снизу."""
+    t, b = safe_insets_px()
+    if top and t:
+        outer.add_widget(BoxLayout(size_hint_y=None, height=t), index=0)
+    if bottom and b:
+        outer.add_widget(BoxLayout(size_hint_y=None, height=b))
+
 # ----------------------------------------------------------------------
 # Палитра (RGB 0..1)
 # ----------------------------------------------------------------------
@@ -281,6 +313,7 @@ def wrap_screen(scr, title, content):
     """Добавляет в экран верхнюю панель с кнопкой «Назад» и прокручиваемый контент."""
     outer = BoxLayout(orientation="vertical")
     paint_bg(outer, BG)
+    add_safe_spacers(outer, top=True, bottom=False)
     bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=sc(64),
                     padding=(sc(6), sc(6)), spacing=sc(8))
     paint_bg(bar, PANEL)
@@ -296,6 +329,7 @@ def wrap_screen(scr, title, content):
     bar.add_widget(tl)
     outer.add_widget(bar)
     outer.add_widget(as_scroll(content))
+    add_safe_spacers(outer, top=False, bottom=True)
     scr.add_widget(outer)
 
 
@@ -1129,6 +1163,9 @@ class MenuScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
         paint_bg(self, BG)
+        outer = BoxLayout(orientation="vertical")
+        paint_bg(outer, BG)
+        add_safe_spacers(outer, top=True, bottom=False)
         t = auto_area("Расчётный модуль КИПиА", size=25, color=PRIMARY)
         t.bold = True
         t.halign = "center"
@@ -1142,7 +1179,9 @@ class MenuScreen(Screen):
             b = make_button(name, bg=PRIMARY, height=58)
             b.bind(on_press=lambda _wdt, n=name: self.goto(n))
             content.add_widget(b)
-        self.add_widget(as_scroll(content))
+        outer.add_widget(as_scroll(content))
+        add_safe_spacers(outer, top=False, bottom=True)
+        self.add_widget(outer)
 
     def goto(self, name):
         for n, _cls in MENU_ITEMS:

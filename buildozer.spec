@@ -16,7 +16,9 @@ requirements = python3,kivy==2.3.1
 
 # Порядок экранов: только книжная ориентация — экраны спроектированы вертикально
 orientation = portrait
-fullscreen = 0
+# Полноэкранный режим: приложение рисует на весь экран, системные панели скрыты.
+# Безопасные отступы под вырез камеры и жесты добавляются в main.py.
+fullscreen = 1
 
 # Иконка приложения (512x512 PNG)
 icon.filename = %(source.dir)s/appicon.png
@@ -30,6 +32,8 @@ android.accept_sdk_license = True
 android.ndk = 25b
 android.minapi = 21
 android.api = 33
+# Разрешить приложению рисовать в область выреза дисплея (камера/отверстие) на API 28+
+android.display_cutout = shortEdges
 
 # Логика приложения не хранит данные на диске, внешний storage не требуется
 android.allow_backup = True
