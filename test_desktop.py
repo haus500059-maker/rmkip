@@ -74,6 +74,8 @@ def drive(dt):
         check("flow signal 100%=20", near(r2[5], 20.0), r2)
         check("flow custom 50% q=50", near(r1[1], 50.0), r1)
         check("flow rel err 100% dp=10", near(r2[5] and 0.0, 0.0) or True, "ok")
+        s.on_copy()
+        check("flow copy ok", "т/ч" in s.rows[0][2], "copy must not crash")
 
         # ---------- 3. Диагностика ----------
         s = sm.get_screen("scr_Диагностика датчика")

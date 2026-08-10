@@ -454,8 +454,8 @@ class FlowScreen(Screen):
             popup("Инфо", "Сначала выполните расчёт.", "info")
             return
         lines = ["%\tРасход\tЕд.\tПерепад\tОтн.погр.,%\tСигнал"]
-        for r in self.rows:
-            lines.append("\t".join(f"{x:.2f}" for x in r))
+        for pct, q, unit, dp_dis, rel, sig in self.rows:
+            lines.append(f"{pct:.2f}\t{q:.2f}\t{unit}\t{dp_dis:.2f}\t{rel:.2f}\t{sig:.2f}")
         copy_text("\n".join(lines))
 
 
