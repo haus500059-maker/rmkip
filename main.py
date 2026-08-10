@@ -586,7 +586,7 @@ class TempScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        heading(content, "Термометр (R ↔ t)")
+        heading(content, "Термометр (R и t)")
         self.s_thermo = make_spinner(core.THERMO_DISPLAY_LIST + ["Пользовательская"], index=1)
         field(content, "Тип термометра:", self.s_thermo, cap_size=13)
 
@@ -617,7 +617,7 @@ class TempScreen(Screen):
         content.add_widget(self.l_r)
 
         # ΔR ↔ Δt
-        heading(content, "Пересчёт погрешности ΔR ↔ Δt")
+        heading(content, "Пересчёт погрешности ΔR / Δt")
         self.e_err_t = make_input()
         field(content, "t, °C:", self.e_err_t)
         self.e_err_dr = make_input()
@@ -629,7 +629,7 @@ class TempScreen(Screen):
         content.add_widget(self.l_delta)
 
         # таблица поверки
-        heading(content, "Таблица поверки (точки → номинал R)")
+        heading(content, "Таблица поверки (точки в номинал R)")
         self.e_tmin = make_input(); self.e_tmin.text = "0"
         self.e_tmax = make_input(); self.e_tmax.text = "100"
         pair_grid(content, 2, [("t min, °C", self.e_tmin), ("t max, °C", self.e_tmax)])
@@ -710,7 +710,7 @@ class TempScreen(Screen):
             popup("Инфо", "Заполните ОДНО из полей: δR или δt (плюс t).", "warn")
             return
         self.l_delta.text = (f"dR/dt(t={tv:.1f} °C) = {drdt:.4f} Ом/°C\n"
-                             f"δR = {dr:.4f} Ом  ↔  δt = {dt_:.4f} °C")
+                             f"δR = {dr:.4f} Ом  /  δt = {dt_:.4f} °C")
 
     def on_tt_gen(self, *_):
         try:
@@ -791,7 +791,7 @@ class TCScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        heading(content, "Термопара (мВ ↔ °C)")
+        heading(content, "Термопара (мВ и °C)")
         self.s_tc = make_spinner(core.THERMOCOUPLE_DISPLAY_LIST, index=0)
         field(content, "Тип:", self.s_tc, cap_size=13)
 
@@ -808,7 +808,7 @@ class TCScreen(Screen):
         content.add_widget(self.l_e)
 
         # таблица поверки
-        heading(content, "Таблица поверки (точки → номинал ЭДС)")
+        heading(content, "Таблица поверки (точки в номинал ЭДС)")
         self.e_tmin = make_input(); self.e_tmin.text = "0"
         self.e_tmax = make_input(); self.e_tmax.text = "1000"
         pair_grid(content, 2, [("t min, °C", self.e_tmin), ("t max, °C", self.e_tmax)])
@@ -961,7 +961,7 @@ class OrifScreen(Screen):
         content.add_widget(self.l_kappa)
         self.e_kappa = make_input()
         content.add_widget(self.e_kappa)
-        self.l_p1 = cap_label("Абс. давление p1, Па (для газа/пара):")
+        self.l_p1 = cap_label("Абс. давление p1, кПа (для газа/пара, напр. 300):")
         content.add_widget(self.l_p1)
         self.e_p1 = make_input()
         content.add_widget(self.e_p1)
@@ -1028,12 +1028,14 @@ class OrifScreen(Screen):
                 if kappa is None or kappa <= 1.0:
                     raise ValueError("Показатель адиабаты κ должен быть > 1")
                 if not self.e_p1.text.strip():
-                    raise ValueError("Для газа/пара укажите p1 (Па)")
-                p1 = _num(self.e_p1.text)
+                    raise ValueError("Для газа/пара укажите p1 (кПа)")
+                p1 = _num(self.e_p1.text) * 1000.0
                 if p1 <= 0:
-                    raise ValueError("p1 должно быть положительным")
+                    raise ValueError("p1 должно быть положительным числом (кПа)")
                 if dp_pa >= p1:
-                    raise ValueError("ΔP должно быть меньше p1 (p2 > 0)")
+                    raise ValueError("Перепад ΔP должен быть меньше давления p1 "
+                                     f"(введено ΔP={dp_dis:g} {core.UNITS_DISPLAY[self.s_dp_unit.text]}, "
+                                     f"p1={self.e_p1.text} кПа)")
             if rho <= 0 or mu <= 0 or d_pipe_m <= 0 or d_orif_m <= 0:
                 raise ValueError("Значения должны быть положительными")
             if d_orif_m >= d_pipe_m:
@@ -1092,8 +1094,8 @@ class AboutScreen(Screen):
             "• Конвертация единиц давления и расчёт погрешности\n"
             "• Расход по квадратичной зависимости (шкала и сигнал)\n"
             "• Диагностика датчиков и мини-протокол поверки\n"
-            "• Термометры сопротивления: НСХ, R ↔ t, таблицы поверки\n"
-            "• Термопары: НСХ, ЭДС ↔ t, таблицы поверки\n"
+            "• Термометры сопротивления: НСХ, R и t, таблицы поверки\n"
+            "• Термопары: НСХ, ЭДС и t, таблицы поверки\n"
             "• Расход через диафрагму по ГОСТ 8.586.2 / ISO 5167")
 
         self.l_about_3 = make_result_area(content)

@@ -155,10 +155,19 @@ def drive(dt):
         s.s_media.text = "воздух"
         s.on_media()
         check("orif air kappa filled", s.e_kappa.text == "1.4", s.e_kappa.text)
-        s.e_p1.text = "200000"
+        s.e_p1.text = "300"
         s.on_calc()
         r = s.l_res.text
         check("orif air computed", "ε =" in r and "жидкость" not in r.split("ε =", 1)[1][:20], r)
+        # пар: p1 в кПа, перепад меньше p1 — должно работать
+        s.s_media.text = "пар (насыщ.)"
+        s.on_media()
+        s.e_p1.text = "300"
+        try:
+            s.on_calc()
+            check("orif steam works", "ε =" in s.l_res.text, s.l_res.text)
+        except Exception as ex:
+            check("orif steam works", False, str(ex)[:80])
         s.s_media.text = "вода"
         s.on_media()
         check("orif back to water clears gas", s.e_kappa.text == "" and s.e_p1.text == "", (s.e_kappa.text, s.e_p1.text))
