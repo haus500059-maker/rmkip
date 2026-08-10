@@ -52,8 +52,15 @@ BORDER = (0.796, 0.835, 0.882, 1)       # #cbd5e1
 FONT_NAME = "Roboto"
 
 
+class InputError(ValueError):
+    """Ошибка ввода: число не удалось прочитать из поля."""
+
+
 def _num(text):
-    return float(str(text).replace(",", ".").strip())
+    try:
+        return float(str(text).replace(",", ".").strip())
+    except (ValueError, TypeError):
+        raise InputError("Поле должно содержать число (например, 10 или 5,5).")
 
 
 def num_filter(text, from_undo):
@@ -1106,11 +1113,11 @@ class AboutScreen(Screen):
 # ----------------------------------------------------------------------
 MENU_ITEMS = [
     ("Конвертация и погрешность", ConvScreen),
-    ("Расход (квадратичная)", FlowScreen),
     ("Диагностика датчика", DiagScreen),
+    ("Расход (квадратичная)", FlowScreen),
+    ("Расход (диафрагма)", OrifScreen),
     ("Температура (НСХ)", TempScreen),
     ("Термопары (НСХ)", TCScreen),
-    ("Расход (диафрагма)", OrifScreen),
     ("О программе", AboutScreen),
 ]
 
@@ -1143,7 +1150,7 @@ class MenuScreen(Screen):
 
 
 class KIPiAApp(App):
-    title = "Расчётный модуль КИПиА"
+    title = "РМ: КИПиА"
 
     def build(self):
         sm = ScreenManager()

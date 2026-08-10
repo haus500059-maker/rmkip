@@ -1,7 +1,7 @@
 [app]
 
 # Название APK и отображаемое имя приложения
-title = Расчётный модуль КИПиА
+title = РМ: КИПиА
 
 package.name = kipiacalc
 package.domain = org.kipia

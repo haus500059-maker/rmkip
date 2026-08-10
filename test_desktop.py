@@ -163,6 +163,17 @@ def drive(dt):
         s.on_media()
         check("orif back to water clears gas", s.e_kappa.text == "" and s.e_p1.text == "", (s.e_kappa.text, s.e_p1.text))
 
+        # пустые поля -> понятное сообщение, не "could not convert string to float"
+        s.e_dp.text = ""
+        s.e_dpipe.text = ""
+        s.e_dorif.text = ""
+        s.e_mu.text = ""
+        try:
+            s.on_calc()
+            check("orif empty input friendly", True, "no crash")
+        except Exception as ex:
+            check("orif empty input friendly", "could not convert" not in str(ex), str(ex)[:80])
+
         # ---------- 7. О программе ----------
         s = sm.get_screen("scr_О программе")
         check("about mention КИПиА", "КИПиА" in s.l_about_1.text, s.l_about_1.text)
