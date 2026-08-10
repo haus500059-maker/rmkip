@@ -114,7 +114,7 @@ def drive(dt):
         s.on_tt_gen()
         check("temp tt rows==3", len(s.tt_rows) == 3, len(s.tt_rows))
         # внесём номинал+0.1 -> в допуске (tol~0.39 Ом)
-        t, r, tol, ti, v = s.tt_rows[2]
+        t, r, tol, ti, d, v = s.tt_rows[2]
         ti.text = str(round(r + 0.1, 3))
         s.on_tt_check()
         check("temp tt verdict ok", "В допуске" in v.text, v.text)

@@ -274,7 +274,7 @@ def wrap_screen(scr, title, content):
     """Добавляет в экран верхнюю панель с кнопкой «Назад» и прокручиваемый контент."""
     outer = BoxLayout(orientation="vertical")
     paint_bg(outer, BG)
-    bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=sc(56),
+    bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=sc(64),
                     padding=(sc(6), sc(6)), spacing=sc(8))
     paint_bg(bar, PANEL)
     back = Button(text="‹  Меню", font_size=sc(16), background_color=PRIMARY,
@@ -282,8 +282,10 @@ def wrap_screen(scr, title, content):
     back.bind(texture_size=lambda _w, _s: setattr(back, "width", back.texture_size[0] + sc(16)))
     back.bind(on_press=lambda *_a: setattr(scr.manager, "current", "menu"))
     bar.add_widget(back)
-    tl = make_label(title, size=17, bold=True, color=PRIMARY, height=sc(44))
+    tl = auto_area(title, size=17, color=PRIMARY)
+    tl.bold = True
     tl.halign = "center"
+    tl.valign = "middle"
     bar.add_widget(tl)
     outer.add_widget(bar)
     outer.add_widget(as_scroll(content))
@@ -491,7 +493,7 @@ class DiagScreen(Screen):
         heading(content, "Мини-протокол поверки (по точкам)")
         b3 = make_button("Сформировать протокол", self.on_gen)
         content.add_widget(b3)
-        self.tbl = GridLayout(cols=4, size_hint_y=None, spacing=sc(4))
+        self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=sc(4))
         self.tbl.bind(minimum_height=self.tbl.setter("height"))
         content.add_widget(self.tbl)
         b4 = make_button("Проверить точки", self.on_check, bg=SUCCESS)
@@ -530,7 +532,7 @@ class DiagScreen(Screen):
         tol = acc / 100.0 * 16.0
         self.tbl.clear_widgets()
         self.row_inputs = []
-        for h in ["Точка", "Давление", "Ож. ток, мА", "Результат"]:
+        for h in ["Точка", "Давление", "Ож. ток, мА", "Измер. мА", "Результат"]:
             self.tbl.add_widget(cell_label(h, size=12, bold=True, color=PRIMARY))
         for pct in VERIF_POINTS:
             pv = pct / 100.0 * span_v
@@ -541,6 +543,7 @@ class DiagScreen(Screen):
             self.tbl.add_widget(cell_label(f"{pv:,.1f}", size=13))
             self.tbl.add_widget(cell_label(f"{exp:.3f}", size=13))
             self.tbl.add_widget(ti)
+            self.tbl.add_widget(v_lbl)
             self.row_inputs.append((exp, tol, ti, v_lbl))
         popup("Протокол готов", "Введите измеренные мА и нажмите «Проверить точки».", "ok")
 
@@ -724,13 +727,15 @@ class TempScreen(Screen):
             t = tmin + p / 100.0 * (tmax - tmin)
             r = core.temp_to_resistance(t, data["R0"], data["coeffs"])
             ti = make_input(font_size=14, height=40)
+            d_lbl = cell_label("", size=11, color=TEXT)
+            v_lbl = cell_label("", size=11, color=MUTED)
             self.tt_tbl.add_widget(cell_label(f"{p:g}%", size=12))
             self.tt_tbl.add_widget(cell_label(f"{t:.1f}", size=12))
             self.tt_tbl.add_widget(cell_label(f"{r:.3f}", size=12))
             self.tt_tbl.add_widget(ti)
-            v_lbl = cell_label("", size=11, color=MUTED)
+            self.tt_tbl.add_widget(d_lbl)
             self.tt_tbl.add_widget(v_lbl)
-            self.tt_rows.append((t, r, tol, ti, v_lbl))
+            self.tt_rows.append((t, r, tol, ti, d_lbl, v_lbl))
         popup("Готово", "Внесите измеренные R и нажмите «Проверить точки».", "ok")
 
     def on_tt_check(self, *_):
@@ -739,7 +744,7 @@ class TempScreen(Screen):
             return
         data = self.get_data()
         checked = 0
-        for t, r, tol, ti, v_lbl in self.tt_rows:
+        for t, r, tol, ti, d_lbl, v_lbl in self.tt_rows:
             raw = ti.text.strip()
             if not raw:
                 continue
@@ -750,7 +755,9 @@ class TempScreen(Screen):
             d = m - r
             dt_ = d / core.r_derivative(t, data["R0"], data["coeffs"])
             ok = abs(d) <= tol
-            v_lbl.text = f"{d:+.3f}  {'В допуске' if ok else 'Брак'}"
+            d_lbl.text = f"{d:+.3f}"
+            d_lbl.color = SUCCESS if ok else DANGER
+            v_lbl.text = "В допуске" if ok else "Брак"
             v_lbl.color = SUCCESS if ok else DANGER
             checked += 1
         popup("Готово" if checked else "Инфо",
