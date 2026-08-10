@@ -232,14 +232,17 @@ def pair_grid(content, cols, cells):
 
 def popup(title, msg, kind="info"):
     cl = {"info": PRIMARY, "ok": SUCCESS, "error": DANGER, "warn": WARNING}.get(kind, PRIMARY)
-    content = BoxLayout(orientation="vertical", padding=sc(16), spacing=sc(12))
-    lbl = auto_area(str(msg), size=17, color=TEXT)
+    content = BoxLayout(orientation="vertical", padding=sc(18), spacing=sc(14))
+    paint_bg(content, PANEL, radius=sc(12))
+    lbl = auto_area(str(msg), size=18, color=(0.05, 0.07, 0.09, 1))
     content.add_widget(lbl)
-    btn = make_button("ОК", bg=cl, height=48)
+    btn = make_button("ОК", bg=cl, height=50)
     content.add_widget(btn)
     p = Popup(title=title, content=content,
-              size_hint=(0.9, None), height=sc(320), auto_dismiss=True,
+              size_hint=(0.9, None), height=sc(330), auto_dismiss=True,
               title_size=sc(20), title_align="center", title_color=cl)
+    p.background = ""
+    p.background_color = (1, 1, 1, 1)
     btn.bind(on_press=p.dismiss)
     p.open()
 
