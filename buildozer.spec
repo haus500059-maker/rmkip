@@ -38,8 +38,9 @@ android.display_cutout = shortEdges
 # Логика приложения не хранит данные на диске, внешний storage не требуется
 android.allow_backup = True
 
-# Формат release-сборки: AAB для публикации в Google Play
-android.release_artifact = aab
+# Формат release-сборки: APK (подписанный) — подходит для RuStore и прямой
+# установки. Для Google Play при необходимости меняйте на aab.
+android.release_artifact = apk
 
 # iOS (не используется)
 ios.codesign.debug = automatic
