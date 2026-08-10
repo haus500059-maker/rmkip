@@ -2,12 +2,22 @@ name: Build APK
 
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Тип сборки (release — для RuStore, debug — для проверки на телефоне)"
+        required: true
+        default: "release"
+        type: choice
+        options:
+          - release
+          - debug
   push:
     branches: [ main, master ]
 
 jobs:
-  build:
+  debug:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'debug')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,22 +40,22 @@ jobs:
             kivy/buildozer:latest \
             -c "buildozer android update && sed -i 's/source venv\/bin\/activate && pip install -U pip/true/' /app/.buildozer/android/platform/python-for-android/pythonforandroid/build.py && buildozer android debug"
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: kipiacalc-debug-apk
           path: bin/*.apk
 
   # Подписанная release-сборка (APK для RuStore и прямой установки).
-  # Запускается вручную: Actions → Build APK → Run workflow.
-  # Ключ и пароли нужно задать в Secrets репозитория:
+  # Запускается вручную: Actions → Build APK → Run workflow → выбрать release.
+  # Ключ и пароли должны быть заданы в Secrets репозитория:
   #   P4A_RELEASE_KEYSTORE        — содержимое keystore (base64)
   #   P4A_RELEASE_KEYSTORE_PASSWD — пароль хранилища
   #   P4A_RELEASE_KEYALIAS        — алиас ключа
   #   P4A_RELEASE_KEYALIAS_PASSWD — пароль ключа
   release:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.build_type == 'release'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
