@@ -206,12 +206,12 @@ def heading(content, text, size=16, color=PRIMARY):
     content.add_widget(lbl)
 
 
-def field(content, caption, input_widget=None, hint="", cap_size=13, height=74):
-    """Поле с подписью сверху; подпись и поле растянуты на всю ширину."""
-    box = BoxLayout(orientation="vertical", size_hint_y=None,
-                    height=sc(height), spacing=sc(4))
+def field(content, caption, input_widget=None, hint="", cap_size=13):
+    """Поле с подписью сверху; высота авто-подстраивается под контент."""
+    box = BoxLayout(orientation="vertical", size_hint_y=None, spacing=sc(4))
     box.add_widget(cap_label(caption, size=cap_size))
     box.add_widget(input_widget if input_widget is not None else make_input(hint))
+    box.bind(minimum_height=box.setter("height"))
     content.add_widget(box)
 
 
@@ -232,18 +232,14 @@ def pair_grid(content, cols, cells):
 
 def popup(title, msg, kind="info"):
     cl = {"info": PRIMARY, "ok": SUCCESS, "error": DANGER, "warn": WARNING}.get(kind, PRIMARY)
-    body = BoxLayout(orientation="vertical", padding=(0, 0, 0, 0), spacing=sc(10))
-    sv = ScrollView()
-    lbl = auto_area(str(msg), size=15)
-    sv.add_widget(lbl)
-    body.add_widget(sv)
+    content = BoxLayout(orientation="vertical", padding=sc(16), spacing=sc(12))
+    lbl = auto_area(str(msg), size=17, color=TEXT)
+    content.add_widget(lbl)
     btn = make_button("ОК", bg=cl, height=48)
-    body.add_widget(btn)
-    content = BoxLayout(orientation="vertical", padding=sc(18), spacing=sc(10))
-    content.add_widget(body)
+    content.add_widget(btn)
     p = Popup(title=title, content=content,
-              size_hint=(0.88, None), height=sc(340), auto_dismiss=True,
-              title_size=sc(17), title_align="center", title_color=cl)
+              size_hint=(0.9, None), height=sc(320), auto_dismiss=True,
+              title_size=sc(20), title_align="center", title_color=cl)
     btn.bind(on_press=p.dismiss)
     p.open()
 
@@ -278,8 +274,9 @@ def wrap_screen(scr, title, content):
     bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=sc(56),
                     padding=(sc(6), sc(6)), spacing=sc(8))
     paint_bg(bar, PANEL)
-    back = Button(text="‹ Меню", font_size=sc(16), background_color=PRIMARY,
-                  size_hint_x=None)
+    back = Button(text="‹  Меню", font_size=sc(16), background_color=PRIMARY,
+                  size_hint_x=None, padding=(sc(8), sc(6)), halign="center")
+    back.bind(texture_size=lambda _w, _s: setattr(back, "width", back.texture_size[0] + sc(16)))
     back.bind(on_press=lambda *_a: setattr(scr.manager, "current", "menu"))
     bar.add_widget(back)
     tl = make_label(title, size=17, bold=True, color=PRIMARY, height=sc(44))
@@ -578,10 +575,11 @@ class TempScreen(Screen):
 
         heading(content, "Термометр (R ↔ t)")
         self.s_thermo = make_spinner(core.THERMO_DISPLAY_LIST + ["Пользовательская"], index=1)
-        field(content, "Тип:", self.s_thermo, cap_size=13)
+        field(content, "Тип термометра:", self.s_thermo, cap_size=13)
 
         # пользовательская НСХ
         self.panel_nsh = BoxLayout(orientation="vertical", size_hint_y=None, spacing=sc(6))
+        self.panel_nsh.bind(minimum_height=self.panel_nsh.setter("height"))
         content.add_widget(self.panel_nsh)
         self.panel_nsh.add_widget(cap_label("Пользовательская НСХ (R0, A, B, C):", size=13))
         self.e_r0 = make_input("R0, Ом")
