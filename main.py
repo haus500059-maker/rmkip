@@ -16,8 +16,23 @@ from kivy.uix.button import Button
 from kivy.uix.spinner import Spinner
 from kivy.uix.popup import Popup
 from kivy.core.clipboard import Clipboard
+from kivy.core.window import Window
 
 import core
+
+# Дизайн-ширина макета в dp: всё масштабируется под фактическую ширину экрана.
+DESIGN_WIDTH_DP = 360.0
+
+
+def sc(v):
+    """dp → px с учётом реальной ширины экрана (резиновая вёрстка)."""
+    try:
+        w = Window.width
+    except Exception:
+        w = 0
+    if not w:
+        return float(v)
+    return float(v) * (w / DESIGN_WIDTH_DP)
 
 # ----------------------------------------------------------------------
 # Палитра (RGB 0..1)
@@ -44,26 +59,75 @@ def num_filter(text, from_undo):
     return "".join(ch for ch in text if ch in "-.,0123456789")
 
 
+from kivy.graphics import Color, RoundedRectangle
+
 # ----------------------------------------------------------------------
 # Утилиты
 # ----------------------------------------------------------------------
+def paint_bg(widget, color, radius=0.0):
+    """Рисует скруглённую подложку позади виджета (фон экрана / карточки)."""
+    with widget.canvas.before:
+        Color(*color)
+        widget._bg_panel = RoundedRectangle(pos=widget.pos, size=widget.size,
+                                            radius=[radius] * 4)
+    def _upd(*_a):
+        widget._bg_panel.pos = widget.pos
+        widget._bg_panel.size = widget.size
+    widget.bind(pos=_upd, size=_upd)
+    return widget
+
+
+def cap_label(text, size=13, color=MUTED, height=22):
+    """Малая подпись над полем: переносится по своей ширине, авто-высота."""
+    lbl = Label(text=text, font_size=sc(size), color=color, bold=False,
+                halign="left", valign="middle", size_hint=(1, None), height=sc(height))
+    lbl.bind(width=lambda *_a: setattr(lbl, "text_size", (lbl.width - sc(4), None)))
+    def _fit_h(*_a):
+        lbl.height = max(sc(height), lbl.texture_size[1] + sc(4))
+    lbl.bind(texture_size=_fit_h)
+    return lbl
+
+
+def cell_label(text="", size=13, color=TEXT, bold=False):
+    """Ячейка таблицы: по центру, перенос/высота по фактической ширине колонки."""
+    lbl = Label(text=text, font_size=sc(size), color=color, bold=bold,
+                halign="center", valign="middle", size_hint=(1, None))
+    lbl.bind(width=lambda *_a: setattr(lbl, "text_size", (lbl.width - sc(6), None)))
+    def _fit_h(*_a):
+        lbl.height = max(sc(42), lbl.texture_size[1] + sc(12))
+    lbl.bind(texture_size=_fit_h)
+    return lbl
+
+
+def auto_area(text="", size=15, color=TEXT):
+    """Многострочный блок результата: высота по содержимому, перенос по ширине."""
+    lbl = Label(text=text, font_size=sc(size), color=color,
+                halign="left", valign="top", size_hint=(1, None))
+    lbl.bind(width=lambda *_a: setattr(lbl, "text_size", (lbl.width - sc(8), None)))
+    def _fit_h(*_a):
+        lbl.height = lbl.texture_size[1] or sc(40)
+    lbl.bind(texture_size=_fit_h)
+    return lbl
+
+
 def make_label(text, size=17, bold=False, color=TEXT, halign="left",
                valign="middle", wrap=None, height=40):
     if wrap is None:
         wrap = max(120, len(str(text)) * (size + 6))
     return Label(
-        text=text, font_size=size, bold=bold, color=color,
+        text=text, font_size=sc(size), bold=bold, color=color,
         halign=halign, valign=valign,
-        text_size=(wrap, None),
-        size_hint_y=None, height=height,
+        text_size=(sc(wrap), None),
+        size_hint_y=None, height=sc(height),
     )
 
 
 def make_input(hint="", multiline=False, font_size=17, height=48):
     ti = TextInput(
-        hint_text=hint, multiline=multiline, font_size=font_size,
+        hint_text=hint, multiline=multiline, font_size=sc(font_size),
         input_filter=num_filter,
-        size_hint_y=None, height=height,
+        size_hint_y=None, height=sc(height),
+        padding=(sc(12), sc(7), sc(12), sc(7)),
         background_color=(1, 1, 1, 1), foreground_color=TEXT,
         cursor_color=PRIMARY,
     )
@@ -72,8 +136,9 @@ def make_input(hint="", multiline=False, font_size=17, height=48):
 
 def make_text(hint="", multiline=False, font_size=17):
     ti = TextInput(
-        hint_text=hint, multiline=multiline, font_size=font_size,
-        size_hint_y=None, height=48,
+        hint_text=hint, multiline=multiline, font_size=sc(font_size),
+        size_hint_y=None, height=sc(48),
+        padding=(sc(12), sc(7), sc(12), sc(7)),
         background_color=(1, 1, 1, 1), foreground_color=TEXT,
         cursor_color=PRIMARY,
     )
@@ -83,8 +148,8 @@ def make_text(hint="", multiline=False, font_size=17):
 def make_button(text, on_press=None, bg=PRIMARY, fg=(1, 1, 1, 1),
                 bold=True, size=17, height=52):
     kwargs = dict(
-        text=text, font_size=size, bold=bold, background_color=bg,
-        color=fg, size_hint_y=None, height=height,
+        text=text, font_size=sc(size), bold=bold, background_color=bg,
+        color=fg, size_hint_y=None, height=sc(height),
     )
     if on_press is not None:
         kwargs["on_press"] = on_press
@@ -93,15 +158,15 @@ def make_button(text, on_press=None, bg=PRIMARY, fg=(1, 1, 1, 1),
 
 def make_spinner(values, index=0, size=17, height=48):
     sp = Spinner(
-        text=values[index], values=values, font_size=size,
-        size_hint_y=None, height=height,
+        text=values[index], values=values, font_size=sc(size),
+        size_hint_y=None, height=sc(height),
         background_color=(1, 1, 1, 1), color=TEXT,
     )
     return sp
 
 
 def make_row(height=None):
-    return BoxLayout(orientation="horizontal", spacing=8, padding=(0, 2))
+    return BoxLayout(orientation="horizontal", spacing=sc(8), padding=(0, sc(2)))
 
 
 def as_scroll(widget):
@@ -111,27 +176,57 @@ def as_scroll(widget):
 
 
 def new_scroll(width_hint=None, height=None):
-    content = BoxLayout(orientation="vertical", size_hint_y=None, padding=14, spacing=10)
+    content = BoxLayout(orientation="vertical", size_hint_y=None,
+                        padding=sc(14), spacing=sc(12))
     content.bind(minimum_height=content.setter("height"))
     return content
 
 
-def field(content, caption, input_widget=None, hint=""):
-    box = BoxLayout(orientation="vertical", size_hint_y=None, height=76, spacing=2)
-    box.add_widget(make_label(caption, size=14, color=MUTED))
+def heading(content, text, size=16, color=PRIMARY):
+    """Заголовок секции с отступом сверху."""
+    top = BoxLayout(size_hint_y=None, height=sc(6))
+    content.add_widget(top)
+    lbl = auto_area(text, size=size, color=color)
+    lbl.bold = True
+    content.add_widget(lbl)
+
+
+def field(content, caption, input_widget=None, hint="", cap_size=13, height=74):
+    """Поле с подписью сверху; подпись и поле растянуты на всю ширину."""
+    box = BoxLayout(orientation="vertical", size_hint_y=None,
+                    height=sc(height), spacing=sc(4))
+    box.add_widget(cap_label(caption, size=cap_size))
     box.add_widget(input_widget if input_widget is not None else make_input(hint))
     content.add_widget(box)
 
 
+def pair_grid(content, cols, cells):
+    """Сетка из N колонок; в каждой ячейке подпись над контролом (полная ширина)."""
+    g = GridLayout(cols=cols, size_hint_y=None, spacing=sc(10))
+    for caption, widget in cells:
+        b = BoxLayout(orientation="vertical", size_hint_y=None, spacing=sc(4))
+        b.add_widget(cap_label(caption, size=12))
+        b.add_widget(widget)
+        b.height = sc(74)
+        g.add_widget(b)
+    g.height = sc(80)
+    content.add_widget(g)
+    return g
+
+
 def popup(title, msg, kind="info"):
     cl = {"info": PRIMARY, "ok": SUCCESS, "error": DANGER, "warn": WARNING}.get(kind, PRIMARY)
-    content = BoxLayout(orientation="vertical", padding=18, spacing=10)
-    lbl = make_label(str(msg), size=16, wrap=420, halign="left")
-    content.add_widget(lbl)
+    body = BoxLayout(orientation="vertical", padding=(0, 0, 0, 0), spacing=sc(10))
+    sv = ScrollView()
+    lbl = auto_area(str(msg), size=15)
+    sv.add_widget(lbl)
+    body.add_widget(sv)
     btn = make_button("ОК", bg=cl, height=48)
-    content.add_widget(btn)
+    body.add_widget(btn)
+    content = BoxLayout(orientation="vertical", padding=sc(18), spacing=sc(10))
+    content.add_widget(body)
     p = Popup(title=f"[b]{title}[/b]", content=content,
-              size_hint=(0.86, None), height=320, auto_dismiss=True, title_color=PRIMARY)
+              size_hint=(0.88, None), height=sc(340), auto_dismiss=True, title_color=PRIMARY)
     btn.bind(on_press=p.dismiss)
     p.open()
 
@@ -142,19 +237,24 @@ def copy_text(text):
 
 
 # ----------------------------------------------------------------------
-# Хелпер: карточка входа (модуль с таблицей результатов)
+# Хелпер: карточка результата
 # ----------------------------------------------------------------------
 def make_result_area(content):
-    return make_label("", size=16, color=TEXT, halign="left", wrap=520)
+    lbl = auto_area("", size=15)
+    lbl.padding = (sc(12), sc(10))
+    paint_bg(lbl, PANEL, radius=sc(10))
+    return lbl
 
 
 def wrap_screen(scr, title, content):
     """Добавляет в экран верхнюю панель с кнопкой «Назад» и прокручиваемый контент."""
     outer = BoxLayout(orientation="vertical")
-    bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=52,
-                    padding=(10, 6), spacing=10)
-    back = Button(text="‹ Меню", font_size=16, background_color=PRIMARY,
-                  size_hint_x=None, width=120)
+    paint_bg(outer, BG)
+    bar = BoxLayout(orientation="horizontal", size_hint_y=None, height=sc(56),
+                    padding=(sc(10), sc(6)), spacing=sc(10))
+    paint_bg(bar, PANEL)
+    back = Button(text="‹ Меню", font_size=sc(16), background_color=PRIMARY,
+                  size_hint_x=None, width=sc(110))
     back.bind(on_press=lambda *_a: setattr(scr.manager, "current", "menu"))
     bar.add_widget(back)
     bar.add_widget(make_label(title, size=17, bold=True, color=PRIMARY))
@@ -173,14 +273,9 @@ class ConvScreen(Screen):
 
         self.e_value = make_input()
         field(content, "Значение:", self.e_value)
-        r_units = make_row()
-        r_units.add_widget(make_label("Из единицы:", size=14, color=MUTED))
         self.s_from = make_spinner(list(core.UNITS_DISPLAY.keys()), index=8)  # МПа
-        r_units.add_widget(self.s_from)
-        r_units.add_widget(make_label("→ В:", size=14, color=MUTED))
         self.s_to = make_spinner(list(core.UNITS_DISPLAY.keys()), index=7)    # кгс/см²
-        r_units.add_widget(self.s_to)
-        content.add_widget(r_units)
+        pair_grid(content, 2, [("Из единицы:", self.s_from), ("В единицу:", self.s_to)])
         self.e_span = make_input()
         field(content, "ВПИ (для погрешности):", self.e_span)
         self.e_acc = make_input()
@@ -232,27 +327,18 @@ class FlowScreen(Screen):
 
         self.e_qmax = make_input()
         field(content, "Макс. расход:", self.e_qmax)
-        r0 = make_row()
-        r0.add_widget(make_label("Ед. расхода:", size=14, color=MUTED))
         self.s_unit = make_spinner(["т/ч", "м³/ч"])
-        r0.add_widget(self.s_unit)
-        content.add_widget(r0)
+        field(content, "Ед. расхода:", self.s_unit)
 
         self.e_span = make_input()
         field(content, "ВПИ перепада (значение):", self.e_span)
-        r1 = make_row()
-        r1.add_widget(make_label("Ед. перепада:", size=14, color=MUTED))
         self.s_span_unit = make_spinner(["Па", "кПа", "МПа", "бар", "кгс/см²", "кгс/м²"])
-        r1.add_widget(self.s_span_unit)
-        content.add_widget(r1)
+        field(content, "Ед. перепада:", self.s_span_unit)
 
         self.e_acc = make_input()
         field(content, "Класс точности, %:", self.e_acc)
-        r2 = make_row()
-        r2.add_widget(make_label("Сигнал:", size=14, color=MUTED))
         self.s_sig = make_spinner(["мА (4–20)", "В (0–10)", "%"])
-        r2.add_widget(self.s_sig)
-        content.add_widget(r2)
+        field(content, "Сигнал:", self.s_sig)
         self.e_points = make_input()
         field(content, "Точки шкалы (через запятую; пусто — 0..100):", self.e_points)
 
@@ -262,7 +348,7 @@ class FlowScreen(Screen):
         # таблица результатов
         self.tbl_title = make_label("", size=15, bold=True, color=PRIMARY)
         content.add_widget(self.tbl_title)
-        self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=4)
+        self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=sc(4))
         self.tbl.bind(minimum_height=self.tbl.setter("height"))
         content.add_widget(self.tbl)
         b2 = make_button("Скопировать таблицу", self.on_copy,
@@ -305,8 +391,7 @@ class FlowScreen(Screen):
         self.rows = []
         head = ["%", "Расход", "Перепад", "Отн. погр., %", "Сигнал"]
         for h in head:
-            self.tbl.add_widget(make_label(h, size=13, bold=True, color=PRIMARY,
-                                           halign="center"))
+            self.tbl.add_widget(cell_label(h, size=12, bold=True, color=PRIMARY))
         for p in custom:
             if is_custom:
                 q = p
@@ -328,11 +413,11 @@ class FlowScreen(Screen):
                 sig = 10 * pct / 100.0
             else:
                 sig = pct
-            self.tbl.add_widget(make_label(f"{pct:.1f}%", size=14, halign="center"))
-            self.tbl.add_widget(make_label(f"{q:.2f}", size=14, halign="center"))
-            self.tbl.add_widget(make_label(f"{dp_dis:.2f}", size=14, halign="center"))
-            self.tbl.add_widget(make_label(f"{rel:.2f}", size=14, halign="center"))
-            self.tbl.add_widget(make_label(f"{sig:.2f}", size=14, halign="center"))
+            self.tbl.add_widget(cell_label(f"{pct:.1f}%", size=13))
+            self.tbl.add_widget(cell_label(f"{q:.2f}", size=13))
+            self.tbl.add_widget(cell_label(f"{dp_dis:.2f}", size=13))
+            self.tbl.add_widget(cell_label(f"{rel:.2f}", size=13))
+            self.tbl.add_widget(cell_label(f"{sig:.2f}", size=13))
             self.rows.append((pct, q, self.s_unit.text, dp_dis, rel, sig))
 
     def on_copy(self, *_):
@@ -362,11 +447,8 @@ class DiagScreen(Screen):
         field(content, "Зав. №:", self.e_sn)
         self.e_span = make_input()
         field(content, "ВПИ (диапазон):", self.e_span)
-        r0 = make_row()
-        r0.add_widget(make_label("Ед. ВПИ:", size=14, color=MUTED))
         self.s_unit = make_spinner(list(core.UNITS_DISPLAY.keys()), index=8)
-        r0.add_widget(self.s_unit)
-        content.add_widget(r0)
+        field(content, "Ед. ВПИ:", self.s_unit)
         self.e_acc = make_input()
         field(content, "Класс точности, %:", self.e_acc)
 
@@ -379,11 +461,10 @@ class DiagScreen(Screen):
         content.add_widget(b2)
 
         # ---- мини-протокол поверки ----
-        content.add_widget(make_label("Мини-протокол поверки (по точкам)", size=18,
-                                      bold=True, color=PRIMARY))
+        heading(content, "Мини-протокол поверки (по точкам)")
         b3 = make_button("Сформировать протокол", self.on_gen)
         content.add_widget(b3)
-        self.tbl = GridLayout(cols=4, size_hint_y=None, spacing=4)
+        self.tbl = GridLayout(cols=4, size_hint_y=None, spacing=sc(4))
         self.tbl.bind(minimum_height=self.tbl.setter("height"))
         content.add_widget(self.tbl)
         b4 = make_button("Проверить точки", self.on_check, bg=SUCCESS)
@@ -422,16 +503,16 @@ class DiagScreen(Screen):
         tol = acc / 100.0 * 16.0
         self.tbl.clear_widgets()
         self.row_inputs = []
-        for h in ["Точка", "Давление", "Ож. ток, мА", ""]:
-            self.tbl.add_widget(make_label(h, size=13, bold=True, color=PRIMARY, halign="center"))
+        for h in ["Точка", "Давление", "Ож. ток, мА", "Результат"]:
+            self.tbl.add_widget(cell_label(h, size=12, bold=True, color=PRIMARY))
         for pct in VERIF_POINTS:
             pv = pct / 100.0 * span_v
             exp = 4.0 + 16.0 * pct / 100.0
-            ti = make_input(hint="изм. мА", font_size=15)
-            v_lbl = make_label("", size=13, color=MUTED, halign="center")
-            self.tbl.add_widget(make_label(f"{pct}%", size=14, halign="center"))
-            self.tbl.add_widget(make_label(f"{pv:,.1f}", size=14, halign="center"))
-            self.tbl.add_widget(make_label(f"{exp:.3f}", size=14, halign="center"))
+            ti = make_input(hint="мА", font_size=15)
+            v_lbl = cell_label("", size=12, color=MUTED)
+            self.tbl.add_widget(cell_label(f"{pct}%", size=13))
+            self.tbl.add_widget(cell_label(f"{pv:,.1f}", size=13))
+            self.tbl.add_widget(cell_label(f"{exp:.3f}", size=13))
             self.tbl.add_widget(ti)
             self.row_inputs.append((exp, tol, ti, v_lbl))
         popup("Протокол готов", "Введите измеренные мА и нажмите «Проверить точки».", "ok")
@@ -451,9 +532,8 @@ class DiagScreen(Screen):
                 continue
             d = m - exp
             ok = abs(d) <= tol
-            v_lbl.text = f"✓ В допуске" if ok else f"✗ Брак\n(d={d:+.3f})"
+            v_lbl.text = f"{d:+.3f} мА  {'В допуске' if ok else 'БРАК'}"
             v_lbl.color = SUCCESS if ok else DANGER
-            v_lbl.height = 44
             checked += 1
         if checked:
             popup("Готово", f"Проверено точек: {checked}. Вердикт — в зелёном столбце.", "ok")
@@ -469,24 +549,20 @@ class TempScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        content.add_widget(make_label("Термометр (R ↔ t)", size=18, bold=True, color=PRIMARY))
-        r0 = make_row()
-        r0.add_widget(make_label("Тип:", size=14, color=MUTED))
+        heading(content, "Термометр (R ↔ t)")
         self.s_thermo = make_spinner(core.THERMO_DISPLAY_LIST + ["Пользовательская"], index=1)
-        r0.add_widget(self.s_thermo)
-        content.add_widget(r0)
+        field(content, "Тип:", self.s_thermo, cap_size=13)
 
         # пользовательская НСХ
-        self.panel_nsh = BoxLayout(orientation="vertical", size_hint_y=None, spacing=2)
+        self.panel_nsh = BoxLayout(orientation="vertical", size_hint_y=None, spacing=sc(6))
         content.add_widget(self.panel_nsh)
-        self.panel_nsh.add_widget(make_label("Пользовательская НСХ (R0, A, B, C)",
-                                             size=15, bold=True, color=PRIMARY))
+        self.panel_nsh.add_widget(cap_label("Пользовательская НСХ (R0, A, B, C):", size=13))
         self.e_r0 = make_input("R0, Ом")
         self.e_a = make_input("A")
         self.e_b = make_input("B")
         self.e_c = make_input("C")
-        for w in (self.e_r0, self.e_a, self.e_b, self.e_c):
-            self.panel_nsh.add_widget(w)
+        pair_grid(self.panel_nsh, 2, [("R0, Ом", self.e_r0), ("A", self.e_a),
+                                      ("B", self.e_b), ("C", self.e_c)])
 
         # R -> t
         self.e_r = make_input()
@@ -503,49 +579,31 @@ class TempScreen(Screen):
         content.add_widget(self.l_r)
 
         # ΔR ↔ Δt
-        content.add_widget(make_label("Пересчёт погрешности ΔR ↔ Δt", size=16,
-                                      bold=True, color=PRIMARY))
-        r1 = make_row()
-        r1.add_widget(make_label("t, °C:", size=14, color=MUTED))
+        heading(content, "Пересчёт погрешности ΔR ↔ Δt")
         self.e_err_t = make_input()
-        r1.add_widget(self.e_err_t)
-        content.add_widget(r1)
-        r2 = make_row()
-        r2.add_widget(make_label("δR, Ом:", size=14, color=MUTED))
+        field(content, "t, °C:", self.e_err_t)
         self.e_err_dr = make_input()
-        r2.add_widget(self.e_err_dr)
-        r2.add_widget(make_label("δt, °C:", size=14, color=MUTED))
         self.e_err_dt = make_input()
-        r2.add_widget(self.e_err_dt)
-        content.add_widget(r2)
+        pair_grid(content, 2, [("δR, Ом (пусто — расчёт по δt)", self.e_err_dr),
+                               ("δt, °C (пусто — расчёт по δR)", self.e_err_dt)])
         content.add_widget(make_button("ПЕРЕСЧИТАТЬ", self.on_delta))
         self.l_delta = make_result_area(content)
         content.add_widget(self.l_delta)
 
         # таблица поверки
-        content.add_widget(make_label("Таблица поверки (точки → номинал R)", size=16,
-                                      bold=True, color=PRIMARY))
-        r3 = make_row()
-        r3.add_widget(make_label("t min:", size=13, color=MUTED))
+        heading(content, "Таблица поверки (точки → номинал R)")
         self.e_tmin = make_input(); self.e_tmin.text = "0"
-        r3.add_widget(self.e_tmin)
-        r3.add_widget(make_label("t max:", size=13, color=MUTED))
         self.e_tmax = make_input(); self.e_tmax.text = "100"
-        r3.add_widget(self.e_tmax)
-        content.add_widget(r3)
-        r4 = make_row()
-        r4.add_widget(make_label("Кл.точн., %:", size=13, color=MUTED))
+        pair_grid(content, 2, [("t min, °C", self.e_tmin), ("t max, °C", self.e_tmax)])
         self.e_tt_acc = make_input(); self.e_tt_acc.text = "1.0"
-        r4.add_widget(self.e_tt_acc)
-        r4.add_widget(make_label("Точки, %:", size=13, color=MUTED))
         self.e_tt_points = make_input(); self.e_tt_points.text = "0,25,50,75,100"
-        r4.add_widget(self.e_tt_points)
-        content.add_widget(r4)
+        pair_grid(content, 2, [("Кл. точности, %", self.e_tt_acc),
+                               ("Точки, % (через запятую)", self.e_tt_points)])
         td0 = make_row()
         td0.add_widget(make_button("Сформировать таблицу", self.on_tt_gen, height=46))
         td0.add_widget(make_button("Проверить точки", self.on_tt_check, bg=SUCCESS, height=46))
         content.add_widget(td0)
-        self.tt_tbl = GridLayout(cols=6, size_hint_y=None, spacing=4)
+        self.tt_tbl = GridLayout(cols=6, size_hint_y=None, spacing=sc(4))
         self.tt_tbl.bind(minimum_height=self.tt_tbl.setter("height"))
         content.add_widget(self.tt_tbl)
         self.tt_rows = []
@@ -634,17 +692,17 @@ class TempScreen(Screen):
         tol = acc / 100.0 * span_r
         self.tt_tbl.clear_widgets()
         self.tt_rows = []
-        for h in ["Точка", "t,°C", "Номинал R", "Измер. R", "ΔR", "Вердикт"]:
-            self.tt_tbl.add_widget(make_label(h, size=12, bold=True, color=PRIMARY, halign="center"))
+        for h in ["Точка", "t, °C", "Номинал R", "Измер. R", "ΔR", "Вердикт"]:
+            self.tt_tbl.add_widget(cell_label(h, size=11, bold=True, color=PRIMARY))
         for p in pts:
             t = tmin + p / 100.0 * (tmax - tmin)
             r = core.temp_to_resistance(t, data["R0"], data["coeffs"])
             ti = make_input(font_size=14, height=40)
-            self.tt_tbl.add_widget(make_label(f"{p:g}%", size=13, halign="center"))
-            self.tt_tbl.add_widget(make_label(f"{t:.1f}", size=13, halign="center"))
-            self.tt_tbl.add_widget(make_label(f"{r:.3f}", size=13, halign="center"))
+            self.tt_tbl.add_widget(cell_label(f"{p:g}%", size=12))
+            self.tt_tbl.add_widget(cell_label(f"{t:.1f}", size=12))
+            self.tt_tbl.add_widget(cell_label(f"{r:.3f}", size=12))
             self.tt_tbl.add_widget(ti)
-            v_lbl = make_label("", size=12, color=MUTED, halign="center", height=40)
+            v_lbl = cell_label("", size=11, color=MUTED)
             self.tt_tbl.add_widget(v_lbl)
             self.tt_rows.append((t, r, tol, ti, v_lbl))
         popup("Готово", "Внесите измеренные R и нажмите «Проверить точки».", "ok")
@@ -681,12 +739,9 @@ class TCScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        content.add_widget(make_label("Термопара (мВ ↔ °C)", size=18, bold=True, color=PRIMARY))
-        r0 = make_row()
-        r0.add_widget(make_label("Тип:", size=14, color=MUTED))
+        heading(content, "Термопара (мВ ↔ °C)")
         self.s_tc = make_spinner(core.THERMOCOUPLE_DISPLAY_LIST, index=0)
-        r0.add_widget(self.s_tc)
-        content.add_widget(r0)
+        field(content, "Тип:", self.s_tc, cap_size=13)
 
         self.e_emf = make_input()
         field(content, "ЭДС термопары, мВ:", self.e_emf)
@@ -701,29 +756,19 @@ class TCScreen(Screen):
         content.add_widget(self.l_e)
 
         # таблица поверки
-        content.add_widget(make_label("Таблица поверки (точки → номинал ЭДС)", size=16,
-                                      bold=True, color=PRIMARY))
-        r1 = make_row()
-        r1.add_widget(make_label("t min:", size=13, color=MUTED))
+        heading(content, "Таблица поверки (точки → номинал ЭДС)")
         self.e_tmin = make_input(); self.e_tmin.text = "0"
-        r1.add_widget(self.e_tmin)
-        r1.add_widget(make_label("t max:", size=13, color=MUTED))
         self.e_tmax = make_input(); self.e_tmax.text = "1000"
-        r1.add_widget(self.e_tmax)
-        content.add_widget(r1)
-        r2 = make_row()
-        r2.add_widget(make_label("Допуск, °C:", size=13, color=MUTED))
+        pair_grid(content, 2, [("t min, °C", self.e_tmin), ("t max, °C", self.e_tmax)])
         self.e_tol = make_input(); self.e_tol.text = "1.5"
-        r2.add_widget(self.e_tol)
-        r2.add_widget(make_label("Точки, %:", size=13, color=MUTED))
         self.e_points = make_input(); self.e_points.text = "0,25,50,75,100"
-        r2.add_widget(self.e_points)
-        content.add_widget(r2)
+        pair_grid(content, 2, [("Допуск, °C", self.e_tol),
+                               ("Точки, % (через запятую)", self.e_points)])
         td = make_row()
         td.add_widget(make_button("Сформировать таблицу", self.on_tc_gen, height=46))
         td.add_widget(make_button("Проверить точки", self.on_tc_check, bg=SUCCESS, height=46))
         content.add_widget(td)
-        self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=4)
+        self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=sc(4))
         self.tbl.bind(minimum_height=self.tbl.setter("height"))
         content.add_widget(self.tbl)
         self.rows = []
@@ -779,18 +824,18 @@ class TCScreen(Screen):
             return
         self.tbl.clear_widgets()
         self.rows = []
-        for h in ["Точка", "t,°C", "Номинал E", "Измер. E", "Вердикт"]:
-            self.tbl.add_widget(make_label(h, size=12, bold=True, color=PRIMARY, halign="center"))
+        for h in ["Точка", "t, °C", "Номинал E", "Измер. E", "Вердикт"]:
+            self.tbl.add_widget(cell_label(h, size=11, bold=True, color=PRIMARY))
         for p in pts:
             t = tmin + p / 100.0 * (tmax - tmin)
             e = core.tc_temp_to_emf(key, t)
             s = core.tc_sensitivity(key, t)
             tol = (tol_deg * s) if s else 0.0
             ti = make_input(font_size=14, height=40)
-            v_lbl = make_label("", size=12, color=MUTED, halign="center", height=40)
-            self.tbl.add_widget(make_label(f"{p:g}%", size=13, halign="center"))
-            self.tbl.add_widget(make_label(f"{t:.1f}", size=13, halign="center"))
-            self.tbl.add_widget(make_label(f"{e:.4f}", size=13, halign="center"))
+            v_lbl = cell_label("", size=11, color=MUTED)
+            self.tbl.add_widget(cell_label(f"{p:g}%", size=12))
+            self.tbl.add_widget(cell_label(f"{t:.1f}", size=12))
+            self.tbl.add_widget(cell_label(f"{e:.4f}", size=12))
             self.tbl.add_widget(ti)
             self.tbl.add_widget(v_lbl)
             self.rows.append((t, e, tol, ti, v_lbl))
@@ -829,39 +874,32 @@ class OrifScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        content.add_widget(make_label("Расход через диафрагму (ГОСТ 8.586.2)", size=17,
-                                      bold=True, color=PRIMARY))
+        heading(content, "Расход через диафрагму (ГОСТ 8.586.2)")
         self.e_dp = make_input()
         field(content, "Перепад ΔP:", self.e_dp)
-        r0 = make_row()
-        r0.add_widget(make_label("Ед. перепада:", size=14, color=MUTED))
         self.s_dp_unit = make_spinner(list(core.UNITS_DISPLAY.keys()), index=1)  # кПа
-        r0.add_widget(self.s_dp_unit)
-        content.add_widget(r0)
+        field(content, "Ед. перепада:", self.s_dp_unit)
 
         self.e_dpipe = make_input()
         field(content, "Диаметр трубы D, мм:", self.e_dpipe)
         self.e_dorif = make_input()
         field(content, "Диаметр диафрагмы d, мм:", self.e_dorif)
 
-        r1 = make_row()
-        r1.add_widget(make_label("Среда:", size=14, color=MUTED))
         self.s_media = make_spinner(["вода", "пар (насыщ.)", "воздух", "азот",
                                      "кислород", "другое"])
-        r1.add_widget(self.s_media)
-        content.add_widget(r1)
-        self.l_manual = make_label("Плотность, кг/м³ (для «другое»):", size=14, color=MUTED)
+        field(content, "Среда:", self.s_media)
+        self.l_manual = cap_label("Плотность, кг/м³ (для «другое»):")
         content.add_widget(self.l_manual)
         self.e_rho_manual = make_input()
         content.add_widget(self.e_rho_manual)
 
         self.e_mu = make_input()
         field(content, "Вязкость μ, Па·с:", self.e_mu)
-        self.l_kappa = make_label("Адиабата κ (для газа/пара):", size=14, color=MUTED)
+        self.l_kappa = cap_label("Адиабата κ (для газа/пара):")
         content.add_widget(self.l_kappa)
         self.e_kappa = make_input()
         content.add_widget(self.e_kappa)
-        self.l_p1 = make_label("Абс. давление p1, Па (для газа/пара):", size=14, color=MUTED)
+        self.l_p1 = cap_label("Абс. давление p1, Па (для газа/пара):")
         content.add_widget(self.l_p1)
         self.e_p1 = make_input()
         content.add_widget(self.e_p1)
@@ -983,11 +1021,12 @@ class MenuScreen(Screen):
     def __init__(self, **kw):
         super().__init__(**kw)
         content = new_scroll()
-        content.add_widget(make_label("Расчётный модуль КИПиА", size=24, bold=True,
+        paint_bg(self, BG)
+        content.add_widget(make_label("Расчётный модуль КИПиА", size=26, bold=True,
                                       color=PRIMARY))
         content.add_widget(make_label("Выберите раздел:", size=16, color=MUTED))
         for name, _cls in MENU_ITEMS:
-            b = make_button(name, bg=PRIMARY_DARK if False else PRIMARY, height=58)
+            b = make_button(name, bg=PRIMARY, height=58)
             b.bind(on_press=lambda _wdt, n=name: self.goto(n))
             content.add_widget(b)
         self.add_widget(as_scroll(content))

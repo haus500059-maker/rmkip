@@ -93,7 +93,7 @@ def drive(dt):
         # плохое значение на 50%: 12.5 -> откл 0.5 > 0.16
         s.row_inputs[2][2].text = "12.5"
         s.on_check()
-        check("protocol verdict bad", "Брак" in s.row_inputs[2][3].text, s.row_inputs[2][3].text)
+        check("protocol verdict bad", "БРАК" in s.row_inputs[2][3].text, s.row_inputs[2][3].text)
 
         # ---------- 4. Температура ----------
         s = sm.get_screen("scr_Температура (НСХ)")
