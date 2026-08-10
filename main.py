@@ -635,6 +635,8 @@ class TempScreen(Screen):
         self.tt_tbl = GridLayout(cols=6, size_hint_y=None, spacing=sc(4))
         self.tt_tbl.bind(minimum_height=self.tt_tbl.setter("height"))
         content.add_widget(self.tt_tbl)
+        content.add_widget(make_button("Скопировать таблицу", self.on_tt_copy,
+                                       bg=(0.42, 0.447, 0.502, 1), height=46))
         self.tt_rows = []
 
         wrap_screen(self, "Температура (НСХ)", content)
@@ -735,7 +737,7 @@ class TempScreen(Screen):
             self.tt_tbl.add_widget(ti)
             self.tt_tbl.add_widget(d_lbl)
             self.tt_tbl.add_widget(v_lbl)
-            self.tt_rows.append((t, r, tol, ti, d_lbl, v_lbl))
+            self.tt_rows.append((p, t, r, tol, ti, d_lbl, v_lbl))
         popup("Готово", "Внесите измеренные R и нажмите «Проверить точки».", "ok")
 
     def on_tt_check(self, *_):
@@ -744,7 +746,7 @@ class TempScreen(Screen):
             return
         data = self.get_data()
         checked = 0
-        for t, r, tol, ti, d_lbl, v_lbl in self.tt_rows:
+        for p, t, r, tol, ti, d_lbl, v_lbl in self.tt_rows:
             raw = ti.text.strip()
             if not raw:
                 continue
@@ -762,6 +764,16 @@ class TempScreen(Screen):
             checked += 1
         popup("Готово" if checked else "Инфо",
               f"Проверено точек: {checked}." if checked else "Нет данных для проверки.", "ok")
+
+    def on_tt_copy(self, *_):
+        if not self.tt_rows:
+            popup("Инфо", "Сначала сформируйте таблицу.", "info")
+            return
+        lines = ["Точка\tt, °C\tНоминал R\tИзмер. R\tΔR\tВердикт"]
+        for p, t, r, tol, ti, d_lbl, v_lbl in self.tt_rows:
+            lines.append(f"{p:g}%\t{t:.1f}\t{r:.3f}"
+                         f"\t{ti.text.strip()}\t{d_lbl.text.strip()}\t{v_lbl.text.strip()}")
+        copy_text("\n".join(lines))
 
 
 # ----------------------------------------------------------------------
@@ -802,6 +814,8 @@ class TCScreen(Screen):
         self.tbl = GridLayout(cols=5, size_hint_y=None, spacing=sc(4))
         self.tbl.bind(minimum_height=self.tbl.setter("height"))
         content.add_widget(self.tbl)
+        content.add_widget(make_button("Скопировать таблицу", self.on_tc_copy,
+                                       bg=(0.42, 0.447, 0.502, 1), height=46))
         self.rows = []
 
         wrap_screen(self, "Термопары (НСХ)", content)
@@ -869,7 +883,7 @@ class TCScreen(Screen):
             self.tbl.add_widget(cell_label(f"{e:.4f}", size=12))
             self.tbl.add_widget(ti)
             self.tbl.add_widget(v_lbl)
-            self.rows.append((t, e, tol, ti, v_lbl))
+            self.rows.append((p, t, e, tol, ti, v_lbl))
         popup("Готово", "Внесите измеренную ЭДС и нажмите «Проверить точки».", "ok")
 
     def on_tc_check(self, *_):
@@ -878,7 +892,7 @@ class TCScreen(Screen):
             return
         key = self.s_tc.text
         checked = 0
-        for t, e, tol, ti, v_lbl in self.rows:
+        for p, t, e, tol, ti, v_lbl in self.rows:
             raw = ti.text.strip()
             if not raw:
                 continue
@@ -895,6 +909,16 @@ class TCScreen(Screen):
             checked += 1
         popup("Готово" if checked else "Инфо",
               f"Проверено точек: {checked}." if checked else "Нет данных для проверки.", "ok")
+
+    def on_tc_copy(self, *_):
+        if not self.rows:
+            popup("Инфо", "Сначала сформируйте таблицу.", "info")
+            return
+        lines = ["Точка\tt, °C\tНоминал E\tИзмер. E\tВердикт"]
+        for p, t, e, tol, ti, v_lbl in self.rows:
+            lines.append(f"{p:g}%\t{t:.1f}\t{e:.4f}"
+                         f"\t{ti.text.strip()}\t{v_lbl.text.strip()}")
+        copy_text("\n".join(lines))
 
 
 # ----------------------------------------------------------------------
@@ -1068,8 +1092,11 @@ class AboutScreen(Screen):
         self.l_about_3 = make_result_area(content)
         content.add_widget(self.l_about_3)
         self.l_about_3.text = (
-            "Приложение написано на языке Python (фреймворк Kivy).\n\n"
-            "Автор: Евгений Харлин\nГод: 2026")
+            "Приложение написано на языке Python (фреймворк Kivy).")
+
+        self.l_cr = make_label("© Евгений Харлин, 2026 г.", size=18, bold=True,
+                               color=PRIMARY, halign="center")
+        content.add_widget(self.l_cr)
 
         wrap_screen(self, "О программе", content)
 

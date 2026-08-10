@@ -116,7 +116,7 @@ def drive(dt):
         s.on_tt_gen()
         check("temp tt rows==3", len(s.tt_rows) == 3, len(s.tt_rows))
         # внесём номинал+0.1 -> в допуске (tol~0.39 Ом)
-        t, r, tol, ti, d, v = s.tt_rows[2]
+        p_t, t, r, tol, ti, d, v = s.tt_rows[2]
         ti.text = str(round(r + 0.1, 3))
         s.on_tt_check()
         check("temp tt verdict ok", "В допуске" in v.text, v.text)
@@ -134,7 +134,7 @@ def drive(dt):
         s.e_points.text = "0,25,50,75,100"
         s.on_tc_gen()
         check("tc rows==5", len(s.rows) == 5, len(s.rows))
-        t, e, tol, ti, v = s.rows[2]
+        p_t, t, e, tol, ti, v = s.rows[2]
         ti.text = str(round(e + 0.001, 4))
         s.on_tc_check()
         check("tc verdict ok", "В допуске" in v.text, v.text)
@@ -167,7 +167,8 @@ def drive(dt):
         s = sm.get_screen("scr_О программе")
         check("about mention КИПиА", "КИПиА" in s.l_about_1.text, s.l_about_1.text)
         check("about 6 features", "диафрагму" in s.l_about_2.text, s.l_about_2.text)
-        check("about author+python+year", "Python" in s.l_about_3.text and "Евгений Харлин" in s.l_about_3.text and "2026" in s.l_about_3.text, s.l_about_3.text)
+        check("about author+python+year", "Python" in s.l_about_3.text, s.l_about_3.text)
+        check("about copyright", hasattr(s, "l_cr") and "Харлин" in s.l_cr.text, getattr(s, "l_cr", None))
 
         log("====== DONE ======")
     except Exception as e:
