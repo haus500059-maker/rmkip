@@ -38,6 +38,9 @@ android.display_cutout = shortEdges
 # Логика приложения не хранит данные на диске, внешний storage не требуется
 android.allow_backup = True
 
+# Формат release-сборки: AAB для публикации в Google Play
+android.release_artifact = aab
+
 # iOS (не используется)
 ios.codesign.debug = automatic
 

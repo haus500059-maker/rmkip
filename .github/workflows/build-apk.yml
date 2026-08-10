@@ -35,3 +35,48 @@ jobs:
         with:
           name: kipiacalc-debug-apk
           path: bin/*.apk
+
+  # Подписанная release-сборка (AAB для Google Play).
+  # Запускается вручную: Actions → Build APK → Run workflow.
+  # Ключ и пароли нужно задать в Secrets репозитория:
+  #   P4A_RELEASE_KEYSTORE        — содержимое keystore (base64)
+  #   P4A_RELEASE_KEYSTORE_PASSWD — пароль хранилища
+  #   P4A_RELEASE_KEYALIAS        — алиас ключа
+  #   P4A_RELEASE_KEYALIAS_PASSWD — пароль ключа
+  release:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Decode keystore
+        env:
+          P4A_RELEASE_KEYSTORE_B64: ${{ secrets.P4A_RELEASE_KEYSTORE }}
+        run: |
+          echo "$P4A_RELEASE_KEYSTORE_B64" | base64 -d > keystore.keystore
+
+      - name: Build signed release AAB
+        env:
+          P4A_RELEASE_KEYSTORE: /app/keystore.keystore
+          P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.P4A_RELEASE_KEYSTORE_PASSWD }}
+          P4A_RELEASE_KEYALIAS: ${{ secrets.P4A_RELEASE_KEYALIAS }}
+          P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.P4A_RELEASE_KEYALIAS_PASSWD }}
+        run: |
+          docker pull kivy/buildozer:latest
+          docker run --rm \
+            -v "${{ github.workspace }}":/app \
+            -w /app \
+            --entrypoint /bin/bash \
+            -e P4A_RELEASE_KEYSTORE \
+            -e P4A_RELEASE_KEYSTORE_PASSWD \
+            -e P4A_RELEASE_KEYALIAS \
+            -e P4A_RELEASE_KEYALIAS_PASSWD \
+            kivy/buildozer:latest \
+            -c "buildozer android update && sed -i 's/source venv\/bin\/activate && pip install -U pip/true/' /app/.buildozer/android/platform/python-for-android/pythonforandroid/build.py && buildozer android release"
+
+      - name: Upload signed AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: kipiacalc-release-aab
+          path: bin/*.aab
