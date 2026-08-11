@@ -185,6 +185,21 @@ def make_input(hint="", multiline=False, font_size=17, height=48):
     return ti
 
 
+def make_cell_input(hint="", font_size=15):
+    """Компактное поле ввода для ячейки таблицы: высота = высоте ячеек,
+    текст по центру — поле получается ровно напротив значений соседних колонок."""
+    ti = TextInput(
+        hint_text=hint, multiline=False, font_size=sc(font_size),
+        input_filter=num_filter,
+        size_hint_y=None, height=sc(44),
+        padding=(sc(8), sc(2), sc(8), sc(2)),
+        halign="center",
+        background_color=(1, 1, 1, 1), foreground_color=TEXT,
+        cursor_color=PRIMARY,
+    )
+    return ti
+
+
 def make_text(hint="", multiline=False, font_size=17):
     ti = TextInput(
         hint_text=hint, multiline=multiline, font_size=sc(font_size),
@@ -553,7 +568,9 @@ class DiagScreen(Screen):
         content.add_widget(self.tbl)
         b4 = make_button("Проверить точки", self.on_check, bg=SUCCESS)
         content.add_widget(b4)
-        self.row_inputs = []   # (exp, tol, TextInput, verdict_label)
+        b5 = make_button("Копировать протокол", self.on_proto_copy, height=46)
+        content.add_widget(b5)
+        self.row_inputs = []   # (pct, pv, exp, tol, TextInput, verdict_label)
 
         wrap_screen(self, "Диагностика датчика", content)
 
@@ -592,14 +609,14 @@ class DiagScreen(Screen):
         for pct in VERIF_POINTS:
             pv = pct / 100.0 * span_v
             exp = 4.0 + 16.0 * pct / 100.0
-            ti = make_input(hint="мА", font_size=15)
+            ti = make_cell_input(hint="мА", font_size=15)
             v_lbl = cell_label("", size=12, color=MUTED)
             self.tbl.add_widget(cell_label(f"{pct}%", size=13))
             self.tbl.add_widget(cell_label(fmt_point(pv), size=13))
             self.tbl.add_widget(cell_label(f"{exp:.3f}", size=13))
             self.tbl.add_widget(ti)
             self.tbl.add_widget(v_lbl)
-            self.row_inputs.append((exp, tol, ti, v_lbl))
+            self.row_inputs.append((pct, pv, exp, tol, ti, v_lbl))
         popup("Протокол готов", "Введите измеренные мА и нажмите «Проверить точки».", "ok")
 
     def on_check(self, *_):
@@ -607,7 +624,7 @@ class DiagScreen(Screen):
             popup("Инфо", "Сначала сформируйте протокол.", "info")
             return
         checked = 0
-        for exp, tol, ti, v_lbl in self.row_inputs:
+        for pct, pv, exp, tol, ti, v_lbl in self.row_inputs:
             raw = ti.text.strip()
             if not raw:
                 continue
@@ -624,6 +641,30 @@ class DiagScreen(Screen):
             popup("Готово", f"Проверено точек: {checked}. Вердикт — в зелёном столбце.", "ok")
         else:
             popup("Инфо", "Нет данных для проверки (заполните измеренные мА).", "info")
+
+    def on_proto_copy(self, *_):
+        if not self.row_inputs:
+            popup("Инфо", "Сначала сформируйте протокол.", "info")
+            return
+        try:
+            span_v = _num(self.e_span.text)
+            acc = _num(self.e_acc.text)
+        except ValueError:
+            span_v = acc = 0.0
+        line_span = f"ВПИ: {fmt_point(span_v)} {self.s_unit.text}" if span_v else "ВПИ: —"
+        line_acc = f"Класс точности: {acc:g}%" if acc else "Класс точности: —"
+        lines = [
+            f"Тип: {self.e_type.text.strip() or 'Не указан'}",
+            f"Зав. №: {self.e_sn.text.strip() or '-'}",
+            line_span,
+            line_acc,
+            "",
+            "Точка\tДавление, " + self.s_unit.text + "\tОж. ток, мА\tИзмер. мА\tРезультат",
+        ]
+        for pct, pv, exp, tol, ti, v_lbl in self.row_inputs:
+            lines.append(f"{pct}%\t{fmt_point(pv)}\t{exp:.3f}"
+                         f"\t{ti.text.strip() or '—'}\t{v_lbl.text.strip() or '—'}")
+        copy_text("\n".join(lines))
 
 
 # ----------------------------------------------------------------------

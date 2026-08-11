@@ -89,13 +89,19 @@ def drive(dt):
         s.on_gen()
         check("protocol rows==5", len(s.row_inputs) == 5, len(s.row_inputs))
         # хорошее значение на 0%: 4.05 (допуск 0.16)
-        s.row_inputs[0][2].text = "4.05"
+        s.row_inputs[0][4].text = "4.05"
         s.on_check()
-        check("protocol verdict ok", "В допуске" in s.row_inputs[0][3].text, s.row_inputs[0][3].text)
+        check("protocol verdict ok", "В допуске" in s.row_inputs[0][5].text, s.row_inputs[0][5].text)
         # плохое значение на 50%: 12.5 -> откл 0.5 > 0.16
-        s.row_inputs[2][2].text = "12.5"
+        s.row_inputs[2][4].text = "12.5"
         s.on_check()
-        check("protocol verdict bad", "БРАК" in s.row_inputs[2][3].text, s.row_inputs[2][3].text)
+        check("protocol verdict bad", "БРАК" in s.row_inputs[2][5].text, s.row_inputs[2][5].text)
+        # копирование протокола не должно падать
+        try:
+            s.on_proto_copy()
+            check("protocol copy ok", True, "no crash")
+        except Exception as ex:
+            check("protocol copy ok", False, str(ex)[:80])
 
         # ---------- 4. Температура ----------
         s = sm.get_screen("scr_Температура (НСХ)")
