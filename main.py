@@ -299,6 +299,20 @@ def copy_result(lbl):
     copy_text(lbl.text)
 
 
+def fmt_point(v, sig=4):
+    """Точное значение точки поверки (доля ВПИ) без потери от округления.
+    Показывает 1.575 вместо 1.6, чтобы оно совпадало с ожидаемым сигналом
+    (25% от 6.3 кПа = 1.575, сигнал 8.0 мА; округление до 1.6 давало бы 8.06)."""
+    if v == 0:
+        return "0"
+    dec = sig - int(math.floor(math.log10(abs(v)))) - 1
+    dec = max(0, min(dec, 6))
+    s = "{:,.{de}f}".format(v, de=dec)
+    if "." in s:
+        s = s.rstrip("0").rstrip(".")
+    return s
+
+
 # ----------------------------------------------------------------------
 # Хелпер: карточка результата
 # ----------------------------------------------------------------------
@@ -581,7 +595,7 @@ class DiagScreen(Screen):
             ti = make_input(hint="мА", font_size=15)
             v_lbl = cell_label("", size=12, color=MUTED)
             self.tbl.add_widget(cell_label(f"{pct}%", size=13))
-            self.tbl.add_widget(cell_label(f"{pv:,.1f}", size=13))
+            self.tbl.add_widget(cell_label(fmt_point(pv), size=13))
             self.tbl.add_widget(cell_label(f"{exp:.3f}", size=13))
             self.tbl.add_widget(ti)
             self.tbl.add_widget(v_lbl)
