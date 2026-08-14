@@ -80,6 +80,7 @@ PANEL = (1, 1, 1, 1)
 TEXT = (0.122, 0.161, 0.216, 1)         # #1f2937
 MUTED = (0.42, 0.447, 0.502, 1)         # #6b7280
 BORDER = (0.796, 0.835, 0.882, 1)       # #cbd5e1
+SPIN_BG = (0.859, 0.902, 0.973, 1)       # #dbe6f8 — светлый голубой для полей выбора единиц
 
 FONT_NAME = "Roboto"
 
@@ -226,9 +227,34 @@ def make_spinner(values, index=0, size=17, height=48):
     sp = Spinner(
         text=values[index], values=values, font_size=sc(size),
         size_hint_y=None, height=sc(height),
-        background_color=(1, 1, 1, 1), color=TEXT,
+        background_normal="", background_down="",
+        background_color=SPIN_BG, color=TEXT, bold=True,
     )
+    _style_spinner(sp)
     return sp
+
+
+def _style_spinner(sp):
+    """Выделяем Spinner рамкой и стрелкой, чтобы поле выбора не сливалось с фоном."""
+    from kivy.graphics import Color as GColor, Line
+    def _redraw(*_a):
+        sp.canvas.after.clear()
+        if not sp.size[0] or not sp.size[1]:
+            return
+        with sp.canvas.after:
+            GColor(*PRIMARY)
+            Line(rounded_rectangle=(sp.x + sc(1), sp.y + sc(1),
+                                    sp.width - sc(2), sp.height - sc(2),
+                                    sc(7)), width=sc(1.5))
+            # стрелка вниз справа
+            cx = sp.x + sp.width - sc(18)
+            cy = sp.y + sp.height / 2.0
+            GColor(*PRIMARY)
+            Line(points=[cx - sc(5), cy - sc(2), cx, cy + sc(2), cx + sc(5), cy - sc(2)],
+                 width=sc(2))
+    sp.bind(pos=_redraw, size=_redraw)
+    sp.fbind("on_text", _redraw)
+    sp.fbind("on_press", _redraw)
 
 
 def make_row(height=None):
@@ -1158,6 +1184,134 @@ class OrifScreen(Screen):
 
 
 # ----------------------------------------------------------------------
+# ЭКРАН 7. Уровень по давлению
+# ----------------------------------------------------------------------
+class LevelScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        content = new_scroll()
+
+        heading(content, "Уровень по давлению")
+        content.add_widget(make_label(
+            "Пересчёт показаний дифманометра/датчика давления в уровень "
+            "жидкости в резервуаре. Плотность подставляется автоматически "
+            "по среде и температуре.",
+            size=14, color=MUTED, height=56))
+
+        self.s_media = make_spinner(core.LIQUID_DISPLAY_LIST, index=0)
+        field(content, "Среда:", self.s_media)
+
+        self.e_temp = make_input()
+        field(content, "Температура, °C (пусто = 20):", self.e_temp)
+
+        # ручной ввод плотности (для «раствор (ρ вручную)» / «другое»)
+        self.l_rho_manual = cap_label("Плотность при 20°C, кг/м³:")
+        content.add_widget(self.l_rho_manual)
+        self.e_rho_manual = make_input()
+        content.add_widget(self.e_rho_manual)
+
+        self.l_rho = cap_label("", size=13, color=PRIMARY)
+        content.add_widget(self.l_rho)
+
+        self.e_p = make_input()
+        field(content, "Показание датчика P:", self.e_p)
+        self.s_p_unit = make_spinner(list(core.UNITS_DISPLAY.keys()), index=1)  # кПа
+        field(content, "Ед. давления:", self.s_p_unit)
+
+        self.e_vent = make_input()
+        field(content, "Наддув P0 (пусто = 0):", self.e_vent)
+        self.s_vent_unit = make_spinner(list(core.UNITS_DISPLAY.keys()), index=1)
+        field(content, "Ед. наддува:", self.s_vent_unit)
+
+        self.s_media.bind(text=self.update_rho)
+        self.e_temp.bind(text=self.update_rho)
+        self.e_rho_manual.bind(text=self.update_rho)
+        self.update_rho()
+
+        content.add_widget(make_button("РАССЧИТАТЬ УРОВЕНЬ", self.on_calc))
+        self.l_res = make_result_area(content)
+        content.add_widget(self.l_res)
+        content.add_widget(make_button("Копировать результат", lambda *_: copy_result(self.l_res),
+                                       bg=(0.42, 0.447, 0.502, 1), height=46))
+
+        wrap_screen(self, "Уровень по давлению", content)
+
+    def _manual_mode(self):
+        spec = core.LIQUIDS.get(self.s_media.text)
+        return bool(spec and spec["kind"] == "manual")
+
+    def _temp(self):
+        if self.e_temp.text.strip():
+            return _num(self.e_temp.text)
+        return 20.0
+
+    def _density(self):
+        rho20 = None
+        if self._manual_mode() and self.e_rho_manual.text.strip():
+            rho20 = _num(self.e_rho_manual.text)
+        return core.liquid_density(self.s_media.text, self._temp(), rho20)
+
+    def update_rho(self, *_):
+        manual = self._manual_mode()
+        # показываем/скрываем поле ручной плотности
+        if manual:
+            self.l_rho_manual.height = sc(22)
+            self.e_rho_manual.height = sc(48)
+            self.e_rho_manual.disabled = False
+        else:
+            self.l_rho_manual.height = 0
+            self.e_rho_manual.height = 0
+            self.e_rho_manual.disabled = True
+        try:
+            rho = self._density()
+            self.l_rho.text = (f"Плотность при {self._temp():g}°C: "
+                               f"{rho:.2f} кг/м³")
+        except Exception:
+            self.l_rho.text = "Плотность: —"
+
+    def on_calc(self, *_):
+        try:
+            p_val = _num(self.e_p.text)
+            p_pa = p_val * core.UNITS_CALC[core.UNITS_DISPLAY[self.s_p_unit.text]]
+            if p_val < 0:
+                raise ValueError("Показание датчика не может быть отрицательным")
+
+            vent_pa = 0.0
+            vent_txt = "0 (не задан)"
+            if self.e_vent.text.strip():
+                v = _num(self.e_vent.text)
+                vent_pa = v * core.UNITS_CALC[core.UNITS_DISPLAY[self.s_vent_unit.text]]
+                vent_txt = f"{v:g} {self.s_vent_unit.text}"
+            p_eff = p_pa - vent_pa
+            if p_eff < 0:
+                raise ValueError("Давление наддува больше показания датчика — уровень не определяется")
+
+            rho = self._density()
+            if rho <= 0:
+                raise ValueError("Плотность должна быть > 0")
+
+            h_m = core.calc_level(p_eff, rho)
+            h_cm = h_m * 100.0
+
+            lines = [
+                f"Среда: {self.s_media.text}",
+                f"Плотность при {self._temp():g}°C: {rho:.2f} кг/м³",
+                f"P датчика: {p_val:g} {self.s_p_unit.text} = {p_pa:.1f} Па",
+                f"Наддув P0: {vent_txt} (вычитается)",
+                f"Эффективное P: {p_eff:.1f} Па",
+                "",
+                f"УРОВЕНЬ: {h_m:.3f} м  =  {h_cm:.1f} см",
+            ]
+            self.l_res.text = "\n".join(lines)
+        except InputError as e:
+            self.l_res.text = f"Ошибка ввода: {e}"
+            popup("Ошибка ввода", str(e), "error")
+        except ValueError as e:
+            self.l_res.text = f"Ошибка: {e}"
+            popup("Ошибка ввода", str(e), "error")
+
+
+# ----------------------------------------------------------------------
 # ЭКРАН 7. О программе
 # ----------------------------------------------------------------------
 class AboutScreen(Screen):
@@ -1167,7 +1321,7 @@ class AboutScreen(Screen):
 
         content.add_widget(make_label("Расчётный модуль КИПиА", size=22, bold=True,
                                       color=PRIMARY))
-        content.add_widget(make_label("Версия 1.0", size=14, color=MUTED))
+        content.add_widget(make_label("Версия 1.1", size=14, color=MUTED))
 
         self.l_about_1 = make_result_area(content)
         content.add_widget(self.l_about_1)
@@ -1207,6 +1361,7 @@ MENU_ITEMS = [
     ("Диагностика датчика", DiagScreen),
     ("Расход (квадратичная)", FlowScreen),
     ("Расход (диафрагма)", OrifScreen),
+    ("Уровень по давлению", LevelScreen),
     ("Температура (НСХ)", TempScreen),
     ("Термопары (НСХ)", TCScreen),
     ("О программе", AboutScreen),

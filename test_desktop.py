@@ -44,7 +44,7 @@ def drive(dt):
     try:
         app = App.get_running_app()
         sm = app.root
-        check("screens==8", len(sm.screen_names) == 8, str(sm.screen_names))
+        check("screens==9", len(sm.screen_names) == 9, str(sm.screen_names))
 
         # ---------- 1. Конвертация ----------
         s = sm.get_screen("scr_Конвертация и погрешность")
@@ -188,6 +188,48 @@ def drive(dt):
             check("orif empty input friendly", True, "no crash")
         except Exception as ex:
             check("orif empty input friendly", "could not convert" not in str(ex), str(ex)[:80])
+
+        # ---------- 6.1 Уровень по давлению ----------
+        s = sm.get_screen("scr_Уровень по давлению")
+        s.s_media.text = "вода"
+        s.e_temp.text = "20"
+        s.update_rho()
+        check("level water rho ~998.2", near(s._density(), 998.21, 1e-2), s._density())
+        s.e_p.text = "10"      # кПа
+        s.s_p_unit.text = "кПа"
+        s.e_vent.text = ""
+        s.on_calc()
+        r = s.l_res.text
+        check("level 10kPa water ~1.02m", "1.02" in r, r)
+        check("level cm shown", "см" in r, r)
+        # наддув 4 кПа -> эффективные 6 кПа
+        s.e_vent.text = "4"
+        s.s_vent_unit.text = "кПа"
+        s.on_calc()
+        r = s.l_res.text
+        check("level vent subtracted", "6000.0 Па" in r, r)
+        # нефть: плотность ~850
+        s.s_media.text = "нефть"
+        s.e_temp.text = "20"
+        s.e_p.text = "10"
+        s.e_vent.text = ""
+        s.on_calc()
+        r = s.l_res.text
+        check("level oil rho used ~850", "850.00" in r, r)
+        # ручной ввод плотности для «другое»
+        s.s_media.text = "другое"
+        s.e_rho_manual.text = "1200"
+        s.e_p.text = "10"
+        s.e_temp.text = "20"
+        s.on_calc()
+        r = s.l_res.text
+        check("level manual rho 1200", "1200.00" in r, r)
+        # отрицательный уровень при наддуве > давления -> сообщение об ошибке
+        s.s_media.text = "вода"
+        s.e_p.text = "2"
+        s.e_vent.text = "5"
+        s.on_calc()
+        check("level vent>P friendly", "наддув" in s.l_res.text.lower(), s.l_res.text)
 
         # ---------- 7. О программе ----------
         s = sm.get_screen("scr_О программе")

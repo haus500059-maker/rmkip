@@ -509,3 +509,74 @@ def calc_expected_ma(span_pa, acc_val, pressure_pa, signal_min=4, signal_max=20)
     return expected_ma, delta_ma_allowed
 
 
+# --------------------------------------------------------------------------
+# Уровень по давлению: справочник плотностей жидкостей и расчёт уровня
+# --------------------------------------------------------------------------
+GRAVITY_M_S2 = 9.80665  # ускорение свободного падения, м/с²
+
+# Плотность воды, кг/м³, при температурах 0..100 °C (опорные точки для интерполяции)
+WATER_DENSITY_TABLE = [
+    (0, 999.84), (5, 999.97), (10, 999.70), (15, 999.10), (20, 998.21),
+    (25, 997.05), (30, 995.65), (35, 994.03), (40, 992.21), (45, 990.21),
+    (50, 988.04), (55, 985.69), (60, 983.20), (65, 980.55), (70, 977.76),
+    (75, 974.84), (80, 971.80), (85, 968.61), (90, 965.31), (95, 961.89),
+    (100, 958.35),
+]
+
+# beta — коэффициент объёмного теплового расширения, 1/°C
+LIQUIDS = {
+    "вода":                 {"kind": "water",  "rho20": 998.21, "beta": 0.0},
+    "нефть":                {"kind": "linear", "rho20": 850.0,  "beta": 0.0008},
+    "дизельное топливо":    {"kind": "linear", "rho20": 845.0,  "beta": 0.0008},
+    "бензин":               {"kind": "linear", "rho20": 750.0,  "beta": 0.0010},
+    "керосин":              {"kind": "linear", "rho20": 800.0,  "beta": 0.0009},
+    "спирт этиловый":       {"kind": "linear", "rho20": 789.0,  "beta": 0.0011},
+    "молоко":               {"kind": "linear", "rho20": 1030.0, "beta": 0.0005},
+    "раствор (ρ вручную)":  {"kind": "manual", "rho20": 1100.0, "beta": 0.0},
+    "другое":               {"kind": "manual", "rho20": 1000.0, "beta": 0.0},
+}
+LIQUID_DISPLAY_LIST = list(LIQUIDS.keys())
+
+
+def water_density(t_c):
+    """Плотность воды при температуре t_c, кг/м³ (линейная интерполяция таблицы)."""
+    if t_c <= WATER_DENSITY_TABLE[0][0]:
+        return WATER_DENSITY_TABLE[0][1]
+    if t_c >= WATER_DENSITY_TABLE[-1][0]:
+        return WATER_DENSITY_TABLE[-1][1]
+    for i in range(1, len(WATER_DENSITY_TABLE)):
+        t1, d1 = WATER_DENSITY_TABLE[i - 1]
+        t2, d2 = WATER_DENSITY_TABLE[i]
+        if t_c <= t2:
+            f = (t_c - t1) / (t2 - t1)
+            return d1 + (d2 - d1) * f
+    return WATER_DENSITY_TABLE[-1][1]
+
+
+def liquid_density(media, t_c, rho20_manual=None):
+    """Плотность жидкости при температуре t_c, кг/м³.
+
+    Для сред «раствор (ρ вручную)»/«другое» можно передать rho20_manual —
+    плотность при 20 °C, заданную пользователем.
+    """
+    spec = LIQUIDS.get(media)
+    if not spec:
+        raise ValueError("Неизвестная среда: %s" % media)
+    rho20 = rho20_manual if (spec["kind"] == "manual" and rho20_manual) else spec["rho20"]
+    if spec["kind"] == "water":
+        return water_density(t_c)
+    beta = spec["beta"]
+    if not beta:
+        return rho20
+    return rho20 / (1.0 + beta * (t_c - 20.0))
+
+
+def calc_level(p_eff_pa, rho_kg_m3, g=GRAVITY_M_S2):
+    """Высота столба жидкости по гидростатическому давлению, м."""
+    if rho_kg_m3 <= 0:
+        raise ValueError("Плотность должна быть > 0")
+    if p_eff_pa < 0:
+        raise ValueError("Эффективное давление не может быть отрицательным")
+    return p_eff_pa / (rho_kg_m3 * g)
+
+
