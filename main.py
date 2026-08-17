@@ -1312,7 +1312,257 @@ class LevelScreen(Screen):
 
 
 # ----------------------------------------------------------------------
-# ЭКРАН 7. О программе
+# ЭКРАН 7. Расчёт импульсных линий и конденсата
+# ----------------------------------------------------------------------
+class CondScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        content = new_scroll()
+
+        heading(content, "Импульсные линии (конденсат)")
+        content.add_widget(make_label(
+            "Оценка объёма и массы конденсата в импульсной линии, перепада "
+            "ΔP = ρ·g·h и времени накопления. Плотность конденсата — по "
+            "таблице воды при заданной температуре.",
+            size=14, color=MUTED, height=76))
+
+        self.s_media = make_spinner(core.COND_MEDIA_LIST, index=0)
+        field(content, "Рабочая среда:", self.s_media)
+
+        self.e_L = make_input()
+        self.e_L.text = "10"
+        field(content, "Длина линии L, м:", self.e_L)
+
+        tube_names = [t[0] for t in core.COND_TUBES] + ["вручную"]
+        self.s_tube = make_spinner(tube_names, index=1)  # 14×2
+        field(content, "Труба:", self.s_tube)
+
+        # ручной ввод диаметра (скрыт по умолчанию)
+        self.l_d_outer = cap_label("D нар, мм:")
+        content.add_widget(self.l_d_outer)
+        self.e_d_outer = make_input()
+        self.e_d_outer.text = "14"
+        content.add_widget(self.e_d_outer)
+        self.l_t_wall = cap_label("t стенки, мм:")
+        content.add_widget(self.l_t_wall)
+        self.e_t_wall = make_input()
+        self.e_t_wall.text = "2"
+        content.add_widget(self.e_t_wall)
+
+        self.e_slope = make_input()
+        self.e_slope.text = "5"
+        field(content, "Уклон линии, ‰ (0 = горизонтальная):", self.e_slope)
+
+        self.e_temp = make_input()
+        self.e_temp.text = "20"
+        field(content, "Температура среды, °C:", self.e_temp)
+
+        self.e_q = make_input()
+        field(content, "Скорость конденсации Q, мл/ч:", self.e_q)
+
+        self.e_purge = make_input()
+        field(content, "Периодичность продувки, ч (опц.):", self.e_purge)
+
+        self.e_fill = make_input()
+        self.e_fill.text = "50"
+        field(content, "Заполнение конденсатом, %:", self.e_fill)
+
+        # Вторая линия (дифманометр) — переключатель
+        self.btn_second = make_button("Дифманометр: вторая линия — ВЫКЛ",
+                                      self.toggle_second, bg=SPIN_BG, fg=TEXT, height=48)
+        content.add_widget(self.btn_second)
+        self._second_on = False
+
+        self.l_L2 = cap_label("Линия 2 — длина L2, м:")
+        content.add_widget(self.l_L2)
+        self.e_L2 = make_input()
+        self.e_L2.text = "10"
+        content.add_widget(self.e_L2)
+        self.l_slope2 = cap_label("Линия 2 — уклон, ‰:")
+        content.add_widget(self.l_slope2)
+        self.e_slope2 = make_input()
+        self.e_slope2.text = "5"
+        content.add_widget(self.e_slope2)
+        self.l_fill2 = cap_label("Линия 2 — заполнение, %:")
+        content.add_widget(self.l_fill2)
+        self.e_fill2 = make_input()
+        self.e_fill2.text = "0"
+        content.add_widget(self.e_fill2)
+        self._apply_second_visible()
+
+        self.s_media.bind(text=self.update_q)
+        self.e_L.bind(text=self.update_q)
+        self.s_tube.bind(text=self.update_tube)
+        self.update_q()
+        self.update_tube()
+
+        content.add_widget(make_button("РАССЧИТАТЬ", self.on_calc))
+        self.l_res = make_result_area(content)
+        content.add_widget(self.l_res)
+        content.add_widget(make_button("Копировать результат", lambda *_: copy_result(self.l_res),
+                                       bg=(0.42, 0.447, 0.502, 1), height=46))
+        content.add_widget(make_button("Сформировать запись в акт", self.on_act,
+                                       bg=SUCCESS, height=46))
+
+        wrap_screen(self, "Импульсные линии", content)
+
+    # --- переключатель второй линии ---
+    def toggle_second(self, *_):
+        self._second_on = not self._second_on
+        self.btn_second.text = ("Дифманометр: вторая линия — ВКЛ" if self._second_on
+                                else "Дифманометр: вторая линия — ВЫКЛ")
+        self.btn_second.background_color = SUCCESS if self._second_on else SPIN_BG
+        self.btn_second.color = (1, 1, 1, 1) if self._second_on else TEXT
+        self._apply_second_visible()
+
+    def _apply_second_visible(self):
+        for lbl, ent in ((self.l_L2, self.e_L2), (self.l_slope2, self.e_slope2),
+                         (self.l_fill2, self.e_fill2)):
+            self._field_visible(lbl, self._second_on, 22)
+            self._field_visible(ent, self._second_on, 48)
+
+    def _field_visible(self, w, show, height):
+        w.disabled = not show
+        w.height = sc(height) if show else 0
+
+    # --- труба: показать ручной ввод при «вручную» ---
+    def update_tube(self, *_):
+        manual = self.s_tube.text == "вручную"
+        self._field_visible(self.l_d_outer, manual, 22)
+        self._field_visible(self.e_d_outer, manual, 48)
+        self._field_visible(self.l_t_wall, manual, 22)
+        self._field_visible(self.e_t_wall, manual, 48)
+
+    # --- скорость конденсации по умолчанию ---
+    def _q_default(self):
+        media = self.s_media.text
+        L = 10.0
+        if self.e_L.text.strip():
+            try:
+                L = _num(self.e_L.text)
+            except InputError:
+                L = 10.0
+        if "пар" in media:
+            return 7.0 * L / 10.0
+        return 0.0
+
+    def update_q(self, *_):
+        default = self._q_default()
+        if not self.e_q.text.strip() and default:
+            self.e_q.text = f"{default:g}"
+        elif self.s_media.text != "пар/газ с конденсацией" and not self.e_q.text.strip():
+            self.e_q.text = ""
+
+    def _num_or(self, widget, default):
+        if not widget.text.strip():
+            return default
+        return _num(widget.text)
+
+    def on_calc(self, *_):
+        try:
+            L = self._num_or(self.e_L, 0.0)
+            if L <= 0:
+                raise ValueError("Длина линии должна быть больше 0")
+            if self.s_tube.text == "вручную":
+                d_in = core.cond_d_inner_mm("вручную",
+                                            _num(self.e_d_outer.text),
+                                            _num(self.e_t_wall.text))
+            else:
+                d_in = core.cond_d_inner_mm(self.s_tube.text)
+            if d_in <= 0:
+                raise ValueError("Внутренний диаметр должен быть больше 0")
+            slope = self._num_or(self.e_slope, 0.0)
+            fill = self._num_or(self.e_fill, 50.0)
+            t_c = self._num_or(self.e_temp, 20.0)
+
+            l1 = core.cond_line_geometry(L, slope, fill, d_in, t_c)
+            lines = [
+                f"Труба: {self.s_tube.text} (d вн = {d_in:.1f} мм)",
+                f"Среда: {self.s_media.text}, ρ = {l1['rho']:.1f} кг/м³ (при {t_c:g}°C)",
+                f"Объём линии: {l1['V_ml']:.0f} мл  ·  Конденсат: {l1['V_cond']:.0f} мл",
+                f"Масса конденсата: {l1['m_g']:.0f} г",
+                f"Столб h = {l1['h_mm']:.1f} мм",
+                f"Перепад ΔP: {l1['dp_pa']:.0f} Па ≈ {l1['dp_mmh2o']:.1f} мм вод. ст.",
+            ]
+
+            dp_eff_pa = l1["dp_pa"]
+            if self._second_on:
+                L2 = self._num_or(self.e_L2, L)
+                slope2 = self._num_or(self.e_slope2, 0.0)
+                fill2 = self._num_or(self.e_fill2, 0.0)
+                l2 = core.cond_line_geometry(L2, slope2, fill2, d_in, t_c)
+                dh_mm = abs(l1["h_mm"] - l2["h_mm"])
+                dp_eff_pa = dh_mm / 1000.0 * l1["rho"] * core.GRAVITY_M_S2
+                lines.append(f"Δh = |h1 − h2| = {dh_mm:.1f} мм  →  ΔP = "
+                             f"{dp_eff_pa:.0f} Па ≈ {dp_eff_pa / 9.80665:.1f} мм вод. ст.")
+
+            Q = self._num_or(self.e_q, 0.0)
+            if Q > 0:
+                lines.append(f"\nВремя до полного заполнения: {l1['V_ml'] / Q:.0f} ч"
+                             f" (до текущего: {l1['V_cond'] / Q:.0f} ч)")
+            else:
+                lines.append("\nВремя накопления: не задано (Q = 0)")
+
+            kind, status = core.cond_status(dp_eff_pa)
+            purge_h = self._num_or(self.e_purge, 0.0)
+            t_full_h = l1["V_ml"] / Q if Q > 0 else None
+            recs = core.cond_recommendations(slope, fill, dp_eff_pa,
+                                             purge_h or None, t_full_h)
+            lines.append(f"\nСТАТУС: {status}")
+            lines.append("Рекомендации:")
+            lines.extend(f"• {r}" for r in recs)
+            self.l_res.text = "\n".join(lines)
+        except InputError as e:
+            self.l_res.text = f"Ошибка ввода: {e}"
+            popup("Ошибка ввода", str(e), "error")
+        except ValueError as e:
+            self.l_res.text = f"Ошибка: {e}"
+            popup("Ошибка ввода", str(e), "error")
+
+    def on_act(self, *_):
+        """Формирует запись в акт и копирует в буфер."""
+        try:
+            L = self._num_or(self.e_L, 0.0)
+            if L <= 0:
+                raise ValueError("Длина линии должна быть больше 0")
+            if self.s_tube.text == "вручную":
+                d_in = core.cond_d_inner_mm("вручную",
+                                            _num(self.e_d_outer.text),
+                                            _num(self.e_t_wall.text))
+            else:
+                d_in = core.cond_d_inner_mm(self.s_tube.text)
+            slope = self._num_or(self.e_slope, 0.0)
+            fill = self._num_or(self.e_fill, 50.0)
+            t_c = self._num_or(self.e_temp, 20.0)
+            l1 = core.cond_line_geometry(L, slope, fill, d_in, t_c)
+            dp_pa = l1["dp_pa"]
+            if self._second_on:
+                L2 = self._num_or(self.e_L2, L)
+                slope2 = self._num_or(self.e_slope2, 0.0)
+                fill2 = self._num_or(self.e_fill2, 0.0)
+                l2 = core.cond_line_geometry(L2, slope2, fill2, d_in, t_c)
+                dp_pa = abs(l1["h_mm"] - l2["h_mm"]) / 1000.0 * l1["rho"] * core.GRAVITY_M_S2
+
+            tube_name = self.s_tube.text
+            if tube_name == "вручную":
+                tube_name = (f"Ø{_num(self.e_d_outer.text):g}×"
+                             f"{_num(self.e_t_wall.text):g}")
+            act_text = (
+                f"При осмотре выявлено скопление конденсата в импульсной линии "
+                f"длиной {L:g} м (труба {tube_name}, среда — {self.s_media.text}). "
+                f"Расчётный объём конденсата — {l1['V_cond']:.0f} мл, расчётный "
+                f"перепад из-за конденсата — {dp_pa / 9.80665:.1f} мм вод. ст. "
+                f"Выполнена продувка. Показания стабилизированы."
+            )
+            copy_text(act_text)
+        except InputError as e:
+            popup("Ошибка ввода", str(e), "error")
+        except ValueError as e:
+            popup("Ошибка ввода", str(e), "error")
+
+
+# ----------------------------------------------------------------------
+# ЭКРАН 8. О программе
 # ----------------------------------------------------------------------
 class AboutScreen(Screen):
     def __init__(self, **kw):
@@ -1321,7 +1571,7 @@ class AboutScreen(Screen):
 
         content.add_widget(make_label("Расчётный модуль КИПиА", size=22, bold=True,
                                       color=PRIMARY))
-        content.add_widget(make_label("Версия 1.1", size=14, color=MUTED))
+        content.add_widget(make_label("Версия 1.2", size=14, color=MUTED))
 
         self.l_about_1 = make_result_area(content)
         content.add_widget(self.l_about_1)
@@ -1339,12 +1589,26 @@ class AboutScreen(Screen):
             "• Диагностика датчиков и мини-протокол поверки\n"
             "• Термометры сопротивления: НСХ, R и t, таблицы поверки\n"
             "• Термопары: НСХ, ЭДС и t, таблицы поверки\n"
-            "• Расход через диафрагму по ГОСТ 8.586.2 / ISO 5167")
+            "• Расход через диафрагму по ГОСТ 8.586.2 / ISO 5167\n"
+            "• Уровень по давлению (дифманометр, плотность по среде)\n"
+            "• Импульсные линии: объём и масса конденсата, перепад ΔP = ρ·g·h")
 
         self.l_about_3 = make_result_area(content)
         content.add_widget(self.l_about_3)
         self.l_about_3.text = (
             "Приложение написано на языке Python (фреймворк Kivy).")
+
+        heading(content, "Что нового в версии 1.2")
+        self.l_about_new = make_result_area(content)
+        content.add_widget(self.l_about_new)
+        self.l_about_new.text = (
+            "Версия 1.2: добавлен расчёт конденсата в импульсных линиях — "
+            "объём, масса, перепад ΔP = ρ·g·h, время накопления\n"
+            "• Рекомендации по уклону, дренажу и периодичности продувки "
+            "с цветовым статусом\n"
+            "• Формирование записи в акт одним нажатием\n"
+            "• Уровень по давлению: плотность подставляется автоматически "
+            "по среде и температуре")
 
         self.l_cr = make_label("© Евгений Харлин, 2026 г.", size=18, bold=True,
                                color=PRIMARY, halign="center")
@@ -1362,6 +1626,7 @@ MENU_ITEMS = [
     ("Расход (квадратичная)", FlowScreen),
     ("Расход (диафрагма)", OrifScreen),
     ("Уровень по давлению", LevelScreen),
+    ("Импульсные линии (конденсат)", CondScreen),
     ("Температура (НСХ)", TempScreen),
     ("Термопары (НСХ)", TCScreen),
     ("О программе", AboutScreen),

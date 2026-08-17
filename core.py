@@ -580,3 +580,74 @@ def calc_level(p_eff_pa, rho_kg_m3, g=GRAVITY_M_S2):
     return p_eff_pa / (rho_kg_m3 * g)
 
 
+# ----------------------------------------------------------------------
+# Импульсные линии и конденсат
+# ----------------------------------------------------------------------
+COND_TUBES = [
+    ("16×3", 16.0, 3.0),
+    ("14×2", 14.0, 2.0),
+    ("10×1", 10.0, 1.0),
+    ("8×1", 8.0, 1.0),
+]
+COND_MEDIA_LIST = ["пар/газ с конденсацией", "вода", "воздух", "азот"]
+
+
+def cond_d_inner_mm(tube_name, d_outer=None, t_wall=None):
+    """Внутренний диаметр трубки, мм. d_outer/t_wall нужны для «вручную»."""
+    for name, d_o, t_w in COND_TUBES:
+        if tube_name == name:
+            return d_o - 2.0 * t_w
+    d_o = float(d_outer) if d_outer else 14.0
+    t_w = float(t_wall) if t_wall else 2.0
+    return d_o - 2.0 * t_w
+
+
+def cond_line_geometry(L_m, slope_permille, fill_pct, d_in_mm, t_c):
+    """Геометрия одной линии: объём, масса конденсата, столб h, перепад ΔP.
+    slope_permille: уклон в ‰ (0 — горизонтальная); fill_pct: заполнение, %."""
+    S_mm2 = math.pi * d_in_mm ** 2 / 4.0
+    V_ml = S_mm2 * L_m                       # объём линии, мл
+    fill = max(0.0, min(100.0, fill_pct)) / 100.0
+    V_cond = V_ml * fill                     # объём конденсата, мл
+    rho = water_density(t_c)
+    m_g = V_cond * rho / 1000.0              # масса, г
+    if slope_permille > 0:
+        h_mm = fill * L_m * slope_permille   # столб по вертикали, мм
+    else:
+        h_mm = fill * d_in_mm                # горизонтальная: по высоте трубы
+    h_m = h_mm / 1000.0
+    dp_pa = rho * GRAVITY_M_S2 * h_m
+    dp_mmh2o = dp_pa / 9.80665
+    return {
+        "V_ml": V_ml, "V_cond": V_cond, "m_g": m_g,
+        "h_mm": h_mm, "dp_pa": dp_pa, "dp_mmh2o": dp_mmh2o, "rho": rho,
+    }
+
+
+def cond_status(dp_pa):
+    """Статус по перепаду: (ключ, текст)."""
+    if dp_pa < 10.0:
+        return "ok", "Норма"
+    if dp_pa < 100.0:
+        return "warn", "Требуется продувка"
+    if dp_pa < 500.0:
+        return "warn", "Риск неверных показаний"
+    return "error", "Требуется перемонтаж"
+
+
+def cond_recommendations(slope, fill, dp_pa, purge_h=None, t_full_h=None):
+    recs = []
+    if slope == 0 and fill > 0:
+        recs.append("Проверить уклон линии (обеспечить ≥5‰ в сторону датчика), "
+                    "добавить дренаж в нижней точке.")
+    if dp_pa >= 10.0:
+        recs.append("Продуть линию.")
+    if purge_h and t_full_h and purge_h >= t_full_h:
+        recs.append(f"Сократить периодичность продувки до {max(1, int(t_full_h))} ч.")
+    if dp_pa >= 500.0:
+        recs.append("Перенести датчик ближе к отбору или установить конденсатоотводчик.")
+    if not recs:
+        recs.append("Продувка по регламенту; риск минимален.")
+    return recs
+
+

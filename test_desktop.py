@@ -44,7 +44,7 @@ def drive(dt):
     try:
         app = App.get_running_app()
         sm = app.root
-        check("screens==9", len(sm.screen_names) == 9, str(sm.screen_names))
+        check("screens==10", len(sm.screen_names) == 10, str(sm.screen_names))
 
         # ---------- 1. Конвертация ----------
         s = sm.get_screen("scr_Конвертация и погрешность")
@@ -234,9 +234,59 @@ def drive(dt):
         # ---------- 7. О программе ----------
         s = sm.get_screen("scr_О программе")
         check("about mention КИПиА", "КИПиА" in s.l_about_1.text, s.l_about_1.text)
-        check("about 6 features", "диафрагму" in s.l_about_2.text, s.l_about_2.text)
+        check("about 7 features", "импульсные" in s.l_about_2.text.lower(), s.l_about_2.text)
         check("about author+python+year", "Python" in s.l_about_3.text, s.l_about_3.text)
         check("about copyright", hasattr(s, "l_cr") and "Харлин" in s.l_cr.text, getattr(s, "l_cr", None))
+        check("about new in 1.2", hasattr(s, "l_about_new") and "1.2" in s.l_about_new.text
+              and "конденсат" in s.l_about_new.text, getattr(s, "l_about_new", None))
+
+        # ---------- 7.1 Импульсные линии и конденсат ----------
+        s = sm.get_screen("scr_Импульсные линии (конденсат)")
+        # база: 10 м, 14×2 (d=10), уклон 5‰, заполнение 50%, 20°C
+        s.e_L.text = "10"
+        s.s_tube.text = "14×2"
+        s.e_slope.text = "5"
+        s.e_fill.text = "50"
+        s.e_temp.text = "20"
+        s.e_q.text = "7"
+        s.e_purge.text = ""
+        s.on_calc()
+        r = s.l_res.text
+        check("cond volume line 785ml", "785" in r, r)
+        check("cond volume condensate 393ml", "393" in r, r)
+        check("cond mass ~392g", "392" in r, r)
+        check("cond dP ~245Pa", "245" in r, r)
+        check("cond mmh2o ~25", "25.0" in r, r)
+        check("cond h=25mm", "25.0" in r, r)
+        check("cond status present", "СТАТУС" in r, r)
+        # горизонтальная линия -> h по диаметру, 5мм
+        s.e_slope.text = "0"
+        s.on_calc()
+        r = s.l_res.text
+        check("cond horizontal h ~5mm", "5.0" in r, r)
+        # вторая линия: та же длина, заполнение 0 -> dh = 25 мм
+        s.e_slope.text = "5"
+        s.toggle_second()
+        s.e_L2.text = "10"
+        s.e_slope2.text = "5"
+        s.e_fill2.text = "0"
+        s.on_calc()
+        r = s.l_res.text
+        check("cond two lines dh 25", "25.0" in r, r)
+        check("cond two lines dP 245", "245" in r, r)
+        s.toggle_second()
+        # акт
+        s.on_act()
+        check("cond act copied", "конденсата" in main.Clipboard.paste(), main.Clipboard.paste()[:80])
+        # пустая длина -> дружелюбное сообщение
+        s.e_L.text = ""
+        s.on_calc()
+        check("cond empty L friendly", "Ошибка" in s.l_res.text, s.l_res.text)
+        # проверка core напрямую
+        l1 = core.cond_line_geometry(10, 5, 50, 10, 20)
+        check("core cond line dp ~245", near(l1["dp_pa"], 245.16, 1e-2), l1["dp_pa"])
+        check("core cond status ok-range", core.cond_status(5)[0] == "ok", core.cond_status(5))
+        check("core cond status err-range", core.cond_status(600)[0] == "error", core.cond_status(600))
 
         log("====== DONE ======")
     except Exception as e:

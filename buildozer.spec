@@ -10,7 +10,7 @@ source.dir = .
 source.include_exts = py,png,kv,atlas,txt
 source.include_globs =
 
-version = 1.1
+version = 1.2
 
 requirements = python3,kivy==2.3.1
 
