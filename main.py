@@ -1360,6 +1360,19 @@ class CondScreen(Screen):
         self.e_q = make_input()
         field(content, "Скорость конденсации Q, мл/ч:", self.e_q)
 
+        # Режим конденсации: постепенная / быстрое остывание
+        self.btn_mode = make_button("Режим: постепенная конденсация",
+                                    self.toggle_mode, bg=SPIN_BG, fg=TEXT, height=48)
+        content.add_widget(self.btn_mode)
+        self._fast = False
+
+        self.l_cool = cap_label("Время остывания, ч (после продувки/остановки):")
+        content.add_widget(self.l_cool)
+        self.e_cool = make_input()
+        self.e_cool.text = "2"
+        content.add_widget(self.e_cool)
+        self._apply_cool_visible()
+
         self.e_purge = make_input()
         field(content, "Периодичность продувки, ч (опц.):", self.e_purge)
 
@@ -1421,6 +1434,23 @@ class CondScreen(Screen):
             self._field_visible(lbl, self._second_on, 22)
             self._field_visible(ent, self._second_on, 48)
 
+    # --- переключатель режима конденсации ---
+    def toggle_mode(self, *_):
+        self._fast = not self._fast
+        self.btn_mode.text = ("Режим: быстрое остывание (весь пар сконденсируется)"
+                              if self._fast else "Режим: постепенная конденсация")
+        self.btn_mode.background_color = SUCCESS if self._fast else SPIN_BG
+        self.btn_mode.color = (1, 1, 1, 1) if self._fast else TEXT
+        self._apply_cool_visible()
+        if self._fast:
+            if self.e_fill.text.strip() == "50":
+                self.e_fill.text = "100"
+        self.e_q.disabled = self._fast
+
+    def _apply_cool_visible(self):
+        self._field_visible(self.l_cool, self._fast, 22)
+        self._field_visible(self.e_cool, self._fast, 48)
+
     def _field_visible(self, w, show, height):
         w.disabled = not show
         w.height = sc(height) if show else 0
@@ -1447,6 +1477,8 @@ class CondScreen(Screen):
         return 0.0
 
     def update_q(self, *_):
+        if self._fast:
+            return
         default = self._q_default()
         if not self.e_q.text.strip() and default:
             self.e_q.text = f"{default:g}"
@@ -1484,6 +1516,11 @@ class CondScreen(Screen):
                 f"Столб h = {l1['h_mm']:.1f} мм",
                 f"Перепад ΔP: {l1['dp_pa']:.0f} Па ≈ {l1['dp_mmh2o']:.1f} мм вод. ст.",
             ]
+            if self._fast:
+                lines.insert(0, f"Режим: быстрое остывание — весь пар в объёме "
+                                f"линии сконденсируется за ~{self._num_or(self.e_cool, 2.0):g} ч")
+            else:
+                lines.insert(0, "Режим: постепенная конденсация (по скорости Q)")
 
             dp_eff_pa = l1["dp_pa"]
             if self._second_on:
@@ -1497,17 +1534,25 @@ class CondScreen(Screen):
                              f"{dp_eff_pa:.0f} Па ≈ {dp_eff_pa / 9.80665:.1f} мм вод. ст.")
 
             Q = self._num_or(self.e_q, 0.0)
-            if Q > 0:
+            if self._fast:
+                t_cool_h = max(0.1, self._num_or(self.e_cool, 2.0))
+                lines.append(f"\nВремя до полного заполнения: ~{t_cool_h:g} ч "
+                             f"(равно времени остывания; Q не используется)")
+                t_full_h = t_cool_h
+            elif Q > 0:
                 lines.append(f"\nВремя до полного заполнения: {l1['V_ml'] / Q:.0f} ч"
                              f" (до текущего: {l1['V_cond'] / Q:.0f} ч)")
+                t_full_h = l1["V_ml"] / Q
             else:
                 lines.append("\nВремя накопления: не задано (Q = 0)")
+                t_full_h = None
 
-            kind, status = core.cond_status(dp_eff_pa)
+            kind, status = core.cond_status(dp_eff_pa, fast_cool=self._fast)
             purge_h = self._num_or(self.e_purge, 0.0)
-            t_full_h = l1["V_ml"] / Q if Q > 0 else None
-            recs = core.cond_recommendations(slope, fill, dp_eff_pa,
-                                             purge_h or None, t_full_h)
+            recs = core.cond_recommendations(
+                slope, fill, dp_eff_pa, purge_h or None, t_full_h,
+                fast_cool=self._fast,
+                t_cool_h=(self._num_or(self.e_cool, 2.0) if self._fast else None))
             lines.append(f"\nСТАТУС: {status}")
             lines.append("Рекомендации:")
             lines.extend(f"• {r}" for r in recs)
@@ -1554,6 +1599,13 @@ class CondScreen(Screen):
                 f"перепад из-за конденсата — {dp_pa / 9.80665:.1f} мм вод. ст. "
                 f"Выполнена продувка. Показания стабилизированы."
             )
+            if self._fast:
+                act_text = (
+                    act_text[:-1] +
+                    f" Линия была продута/остановлена: при остывании весь пар "
+                    f"в объёме трубы сконденсируется за "
+                    f"~{max(0.1, self._num_or(self.e_cool, 2.0)):g} ч."
+                )
             copy_text(act_text)
         except InputError as e:
             popup("Ошибка ввода", str(e), "error")

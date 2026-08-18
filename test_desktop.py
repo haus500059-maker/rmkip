@@ -275,6 +275,24 @@ def drive(dt):
         check("cond two lines dh 25", "25.0" in r, r)
         check("cond two lines dP 245", "245" in r, r)
         s.toggle_second()
+        # быстрое остывание: 10×1, 7 м, 5‰, 100% -> V=352 мл, Критично
+        s.toggle_mode()
+        check("cond fast fill->100", s.e_fill.text == "100", s.e_fill.text)
+        check("cond fast Q disabled", s.e_q.disabled, s.e_q.disabled)
+        s.e_L.text = "7"
+        s.s_tube.text = "10×1"
+        s.e_slope.text = "5"
+        s.e_fill.text = "100"
+        s.e_cool.text = "2"
+        s.on_calc()
+        r = s.l_res.text
+        check("cond fast mode line", "остывание" in r and "2 ч" in r, r)
+        check("cond fast V 352", "352" in r, r)
+        check("cond fast status critical", "Критично" in r, r)
+        check("cond fast rec", "немедленная продувка" in r, r)
+        s.on_act()
+        check("cond fast act", "остывании" in main.Clipboard.paste(), main.Clipboard.paste()[:120])
+        s.toggle_mode()
         # акт
         s.on_act()
         check("cond act copied", "конденсата" in main.Clipboard.paste(), main.Clipboard.paste()[:80])

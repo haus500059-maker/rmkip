@@ -624,8 +624,16 @@ def cond_line_geometry(L_m, slope_permille, fill_pct, d_in_mm, t_c):
     }
 
 
-def cond_status(dp_pa):
-    """Статус по перепаду: (ключ, текст)."""
+def cond_status(dp_pa, fast_cool=False):
+    """Статус по перепаду: (ключ, текст).
+    fast_cool=True — режим «быстрое остывание»: после продувки/остановки
+    весь пар в объёме линии может сконденсироваться, пороги жёстче."""
+    if fast_cool:
+        if dp_pa >= 294.2:      # 30 мм вод. ст.
+            return "error", "Критично"
+        if dp_pa >= 98.07:      # 10 мм вод. ст.
+            return "warn", "Риск неверных показаний"
+        return "ok", "Норма"
     if dp_pa < 10.0:
         return "ok", "Норма"
     if dp_pa < 100.0:
@@ -635,8 +643,22 @@ def cond_status(dp_pa):
     return "error", "Требуется перемонтаж"
 
 
-def cond_recommendations(slope, fill, dp_pa, purge_h=None, t_full_h=None):
+def cond_recommendations(slope, fill, dp_pa, purge_h=None, t_full_h=None,
+                         fast_cool=False, t_cool_h=None):
     recs = []
+    if fast_cool:
+        t_c = t_cool_h if t_cool_h else 2.0
+        if dp_pa >= 294.2:
+            recs.append(
+                f"Требуется немедленная продувка. При остывании линии весь пар "
+                f"в её объёме сконденсируется за ~{t_c:g} ч. Не допускать "
+                f"остывания без контроля показаний."
+            )
+        else:
+            recs.append(
+                f"После продувки/остановки весь пар в объёме линии сконденсируется "
+                f"за ~{t_c:g} ч — не оставлять линию без контроля показаний."
+            )
     if slope == 0 and fill > 0:
         recs.append("Проверить уклон линии (обеспечить ≥5‰ в сторону датчика), "
                     "добавить дренаж в нижней точке.")
@@ -644,7 +666,7 @@ def cond_recommendations(slope, fill, dp_pa, purge_h=None, t_full_h=None):
         recs.append("Продуть линию.")
     if purge_h and t_full_h and purge_h >= t_full_h:
         recs.append(f"Сократить периодичность продувки до {max(1, int(t_full_h))} ч.")
-    if dp_pa >= 500.0:
+    if not fast_cool and dp_pa >= 500.0:
         recs.append("Перенести датчик ближе к отбору или установить конденсатоотводчик.")
     if not recs:
         recs.append("Продувка по регламенту; риск минимален.")
