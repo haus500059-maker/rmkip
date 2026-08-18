@@ -1437,8 +1437,8 @@ class CondScreen(Screen):
     # --- переключатель режима конденсации ---
     def toggle_mode(self, *_):
         self._fast = not self._fast
-        self.btn_mode.text = ("Режим: быстрое остывание (весь пар сконденсируется)"
-                              if self._fast else "Режим: постепенная конденсация")
+        self.btn_mode.text = ("Режим: быстрое остывание"
+                              if self._fast else "Режим: постепенная")
         self.btn_mode.background_color = SUCCESS if self._fast else SPIN_BG
         self.btn_mode.color = (1, 1, 1, 1) if self._fast else TEXT
         self._apply_cool_visible()
