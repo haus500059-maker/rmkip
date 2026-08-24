@@ -1614,7 +1614,144 @@ class CondScreen(Screen):
 
 
 # ----------------------------------------------------------------------
-# ЭКРАН 8. О программе
+# ЭКРАН 8. 4–20 мА ⇄ Величина
+# ----------------------------------------------------------------------
+MA_UNITS = ["бар", "кПа", "МПа", "мбар", "атм", "пси",
+            "°C", "°F", "K",
+            "м³/ч", "л/с", "л/мин", "кг/ч", "т/ч",
+            "м", "мм", "см", "%"]
+
+MA_PRESETS = [
+    "Пользовательский",
+    "Давление 0–10 бар",
+    "Давление 0–16 бар",
+    "Давление 0–25 бар",
+    "Давление 0–100 кПа",
+    "Давление 0–1 МПа",
+    "Температура –50…+150 °C",
+    "Температура 0–200 °C",
+    "Температура 0–500 °C",
+    "Расход 0–100 м³/ч",
+    "Расход 0–500 л/с",
+    "Уровень 0–10 м",
+    "Уровень 0–100 %",
+]
+
+MA_PRESET_DATA = {
+    "Давление 0–10 бар": (4, 20, 0, 10, "бар"),
+    "Давление 0–16 бар": (4, 20, 0, 16, "бар"),
+    "Давление 0–25 бар": (4, 20, 0, 25, "бар"),
+    "Давление 0–100 кПа": (4, 20, 0, 100, "кПа"),
+    "Давление 0–1 МПа": (4, 20, 0, 1, "МПа"),
+    "Температура –50…+150 °C": (4, 20, -50, 150, "°C"),
+    "Температура 0–200 °C": (4, 20, 0, 200, "°C"),
+    "Температура 0–500 °C": (4, 20, 0, 500, "°C"),
+    "Расход 0–100 м³/ч": (4, 20, 0, 100, "м³/ч"),
+    "Расход 0–500 л/с": (4, 20, 0, 500, "л/с"),
+    "Уровень 0–10 м": (4, 20, 0, 10, "м"),
+    "Уровень 0–100 %": (4, 20, 0, 100, "%"),
+}
+
+
+class MaScreen(Screen):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        content = new_scroll()
+
+        heading(content, "4–20 мА ⇄ Величина")
+        content.add_widget(make_label(
+            "Универсальный пересчёт сигнала 4–20 мА в физическую величину и обратно.",
+            size=14, color=MUTED, height=56))
+
+        self.s_preset = make_spinner(MA_PRESETS, index=0)
+        field(content, "Типовой прибор:", self.s_preset)
+        self.s_preset.bind(text=self.on_preset)
+
+        self.btn_dir = make_button("Направление: мА → Величина",
+                                   self.toggle_dir, bg=SPIN_BG, fg=TEXT, height=48)
+        content.add_widget(self.btn_dir)
+        self._ma2val = True
+
+        self.e_ma_min = make_input()
+        self.e_ma_min.text = "4"
+        field(content, "Сигнал от, мА:", self.e_ma_min)
+        self.e_ma_max = make_input()
+        self.e_ma_max.text = "20"
+        field(content, "Сигнал до, мА:", self.e_ma_max)
+
+        self.e_val_min = make_input()
+        self.e_val_min.text = "0"
+        field(content, "Величина от:", self.e_val_min)
+        self.e_val_max = make_input()
+        self.e_val_max.text = "10"
+        field(content, "Величина до:", self.e_val_max)
+
+        self.s_unit = make_spinner(MA_UNITS, index=0)
+        field(content, "Ед. изм.:", self.s_unit)
+
+        self.e_input = make_input()
+        self.e_input.text = "12"
+        field(content, "Входное значение:", self.e_input)
+
+        content.add_widget(make_button("РАССЧИТАТЬ", self.on_calc))
+        self.l_res = make_result_area(content)
+        content.add_widget(self.l_res)
+        content.add_widget(make_button("Копировать результат", lambda *_: copy_result(self.l_res),
+                                       bg=(0.42, 0.447, 0.502, 1), height=46))
+
+        wrap_screen(self, "4–20 мА ⇄ Величина", content)
+
+    def on_preset(self, *_):
+        name = self.s_preset.text
+        data = MA_PRESET_DATA.get(name)
+        if data:
+            self.e_ma_min.text = str(data[0])
+            self.e_ma_max.text = str(data[1])
+            self.e_val_min.text = str(data[2])
+            self.e_val_max.text = str(data[3])
+            self.s_unit.text = data[4]
+
+    def toggle_dir(self, *_):
+        self._ma2val = not self._ma2val
+        self.btn_dir.text = ("Направление: Величина → мА"
+                             if self._ma2val else "Направление: мА → Величина")
+        self.btn_dir.background_color = SUCCESS if not self._ma2val else SPIN_BG
+        self.btn_dir.color = (1, 1, 1, 1) if not self._ma2val else TEXT
+
+    def on_calc(self, *_):
+        try:
+            ma_min = _num(self.e_ma_min.text)
+            ma_max = _num(self.e_ma_max.text)
+            val_min = _num(self.e_val_min.text)
+            val_max = _num(self.e_val_max.text)
+            inp = _num(self.e_input.text)
+            if ma_max <= ma_min or val_max <= val_min:
+                raise ValueError("Максимум должен быть больше минимума")
+            unit = self.s_unit.text
+            if self._ma2val:
+                pct = (inp - ma_min) / (ma_max - ma_min) * 100
+                val = val_min + (inp - ma_min) / (ma_max - ma_min) * (val_max - val_min)
+                out_of = ""
+                if inp < ma_min or inp > ma_max:
+                    out_of = " [!] ВНЕ ДИАПАЗОНА"
+                self.l_res.text = f"{val:.3f} {unit}  ({pct:.1f}%){out_of}"
+            else:
+                pct = (inp - val_min) / (val_max - val_min) * 100
+                ma = ma_min + (inp - val_min) / (val_max - val_min) * (ma_max - ma_min)
+                out_of = ""
+                if inp < val_min or inp > val_max:
+                    out_of = " [!] ВНЕ ДИАПАЗОНА"
+                self.l_res.text = f"{ma:.3f} мА  ({pct:.1f}%){out_of}"
+        except InputError as e:
+            self.l_res.text = f"Ошибка ввода: {e}"
+            popup("Ошибка ввода", str(e), "error")
+        except ValueError as e:
+            self.l_res.text = f"Ошибка: {e}"
+            popup("Ошибка ввода", str(e), "error")
+
+
+# ----------------------------------------------------------------------
+# ЭКРАН 9. О программе
 # ----------------------------------------------------------------------
 class AboutScreen(Screen):
     def __init__(self, **kw):
@@ -1637,6 +1774,7 @@ class AboutScreen(Screen):
         content.add_widget(self.l_about_2)
         self.l_about_2.text = (
             "• Конвертация единиц давления и расчёт погрешности\n"
+            "• Пересчёт сигнала 4–20 мА ↔ физическая величина (пресеты приборов)\n"
             "• Расход по квадратичной зависимости (шкала и сигнал)\n"
             "• Диагностика датчиков и мини-протокол поверки\n"
             "• Термометры сопротивления: НСХ, R и t, таблицы поверки\n"
@@ -1660,7 +1798,9 @@ class AboutScreen(Screen):
             "с цветовым статусом\n"
             "• Формирование записи в акт одним нажатием\n"
             "• Уровень по давлению: плотность подставляется автоматически "
-            "по среде и температуре")
+            "по среде и температуре\n"
+            "• Пересчёт 4–20 мА ↔ величина: 13 пресетов типовых приборов, "
+            "18 единиц измерения, направление в обе стороны")
 
         self.l_cr = make_label("© Евгений Харлин, 2026 г.", size=18, bold=True,
                                color=PRIMARY, halign="center")
@@ -1674,6 +1814,7 @@ class AboutScreen(Screen):
 # ----------------------------------------------------------------------
 MENU_ITEMS = [
     ("Конвертация и погрешность", ConvScreen),
+    ("4–20 мА ⇄ Величина", MaScreen),
     ("Диагностика датчика", DiagScreen),
     ("Расход (квадратичная)", FlowScreen),
     ("Расход (диафрагма)", OrifScreen),

@@ -44,7 +44,7 @@ def drive(dt):
     try:
         app = App.get_running_app()
         sm = app.root
-        check("screens==10", len(sm.screen_names) == 10, str(sm.screen_names))
+        check("screens==11", len(sm.screen_names) == 11, str(sm.screen_names))
 
         # ---------- 1. Конвертация ----------
         s = sm.get_screen("scr_Конвертация и погрешность")
@@ -59,7 +59,43 @@ def drive(dt):
         check("conv 1(2)MPa->kPa value", "2000.000000" in r, r)
         check("conv rel error 2.5%", "2.50%" in r, r)
 
-        # ---------- 2. Расход ----------
+        # ---------- 2. 4–20 мА ⇄ Величина ----------
+        s = sm.get_screen("scr_4–20 мА ⇄ Величина")
+        s.e_ma_min.text = "4"
+        s.e_ma_max.text = "20"
+        s.e_val_min.text = "0"
+        s.e_val_max.text = "10"
+        s.s_unit.text = "бар"
+        s.e_input.text = "12"
+        s.on_calc()
+        r = s.l_res.text
+        check("ma2val 12mA=5bar", "5.000" in r and "бар" in r, r)
+        check("ma2val 50%", "50.0%" in r, r)
+        # направление: Величина → мА
+        s.toggle_dir()
+        s.e_input.text = "5"
+        s.on_calc()
+        r = s.l_res.text
+        check("val2ma 5bar=12ma", "12.000" in r and "мА" in r, r)
+        # пресет
+        s.s_preset.text = "Давление 0–16 бар"
+        s.on_preset()
+        check("preset 16bar max", s.e_val_max.text == "16", s.e_val_max.text)
+        check("preset unit", s.s_unit.text == "бар", s.s_unit.text)
+        # вне диапазона
+        s.s_preset.text = "Пользовательский"
+        s.e_ma_min.text = "4"
+        s.e_ma_max.text = "20"
+        s.e_val_min.text = "0"
+        s.e_val_max.text = "10"
+        s._ma2val = True
+        s.btn_dir.text = "Направление: мА → Величина"
+        s.e_input.text = "25"
+        s.on_calc()
+        r = s.l_res.text
+        check("ma2val out of range", "ВНЕ ДИАПАЗОНА" in r, r)
+
+        # ---------- 3. Расход ----------
         s = sm.get_screen("scr_Расход (квадратичная)")
         s.e_qmax.text = "100"
         s.e_span.text = "10"
@@ -77,7 +113,7 @@ def drive(dt):
         s.on_copy()
         check("flow copy ok", "т/ч" in s.rows[0][2], "copy must not crash")
 
-        # ---------- 3. Диагностика ----------
+        # ---------- 4. Диагностика ----------
         s = sm.get_screen("scr_Диагностика датчика")
         s.e_type.text = "Ех 3051"
         s.e_sn.text = "SN"
@@ -103,7 +139,7 @@ def drive(dt):
         except Exception as ex:
             check("protocol copy ok", False, str(ex)[:80])
 
-        # ---------- 4. Температура ----------
+        # ---------- 5. Температура ----------
         s = sm.get_screen("scr_Температура (НСХ)")
         s.s_thermo.text = "100П"
         s.e_r.text = "138.5055"
@@ -127,7 +163,7 @@ def drive(dt):
         s.on_tt_check()
         check("temp tt verdict ok", "В допуске" in v.text, v.text)
 
-        # ---------- 5. Термопары ----------
+        # ---------- 6. Термопары ----------
         s = sm.get_screen("scr_Термопары (НСХ)")
         s.s_tc.text = "ТХА (K)"
         s.e_emf.text = "4.0959"
@@ -145,7 +181,7 @@ def drive(dt):
         s.on_tc_check()
         check("tc verdict ok", "В допуске" in v.text, v.text)
 
-        # ---------- 6. Диафрагма ----------
+        # ---------- 7. Диафрагма ----------
         s = sm.get_screen("scr_Расход (диафрагма)")
         s.s_media.text = "вода"
         s.on_media()
@@ -189,7 +225,7 @@ def drive(dt):
         except Exception as ex:
             check("orif empty input friendly", "could not convert" not in str(ex), str(ex)[:80])
 
-        # ---------- 6.1 Уровень по давлению ----------
+        # ---------- 7.1 Уровень по давлению ----------
         s = sm.get_screen("scr_Уровень по давлению")
         s.s_media.text = "вода"
         s.e_temp.text = "20"
@@ -231,16 +267,17 @@ def drive(dt):
         s.on_calc()
         check("level vent>P friendly", "наддув" in s.l_res.text.lower(), s.l_res.text)
 
-        # ---------- 7. О программе ----------
+        # ---------- 8. О программе ----------
         s = sm.get_screen("scr_О программе")
         check("about mention КИПиА", "КИПиА" in s.l_about_1.text, s.l_about_1.text)
-        check("about 7 features", "импульсные" in s.l_about_2.text.lower(), s.l_about_2.text)
+        check("about 10 features", "4–20 мА" in s.l_about_2.text and "импульсные" in s.l_about_2.text.lower(), s.l_about_2.text)
         check("about author+python+year", "Python" in s.l_about_3.text, s.l_about_3.text)
         check("about copyright", hasattr(s, "l_cr") and "Харлин" in s.l_cr.text, getattr(s, "l_cr", None))
         check("about new in 1.2", hasattr(s, "l_about_new") and "1.2" in s.l_about_new.text
-              and "конденсат" in s.l_about_new.text, getattr(s, "l_about_new", None))
+              and "конденсат" in s.l_about_new.text and "4–20 мА" in s.l_about_new.text,
+              getattr(s, "l_about_new", None))
 
-        # ---------- 7.1 Импульсные линии и конденсат ----------
+        # ---------- 8.1 Импульсные линии и конденсат ----------
         s = sm.get_screen("scr_Импульсные линии (конденсат)")
         # база: 10 м, 14×2 (d=10), уклон 5‰, заполнение 50%, 20°C
         s.e_L.text = "10"
