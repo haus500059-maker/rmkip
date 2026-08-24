@@ -1614,7 +1614,7 @@ class CondScreen(Screen):
 
 
 # ----------------------------------------------------------------------
-# ЭКРАН 8. 4–20 мА ⇄ Величина
+# ЭКРАН 8. 4–20 мА → Величина
 # ----------------------------------------------------------------------
 MA_UNITS = ["бар", "кПа", "МПа", "мбар", "атм", "пси",
             "°C", "°F", "K",
@@ -1658,7 +1658,7 @@ class MaScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        heading(content, "4–20 мА ⇄ Величина")
+        heading(content, "4–20 мА → Величина")
         content.add_widget(make_label(
             "Универсальный пересчёт сигнала 4–20 мА в физическую величину и обратно.",
             size=14, color=MUTED, height=56))
@@ -1699,7 +1699,7 @@ class MaScreen(Screen):
         content.add_widget(make_button("Копировать результат", lambda *_: copy_result(self.l_res),
                                        bg=(0.42, 0.447, 0.502, 1), height=46))
 
-        wrap_screen(self, "4–20 мА ⇄ Величина", content)
+        wrap_screen(self, "4–20 мА → Величина", content)
 
     def on_preset(self, *_):
         name = self.s_preset.text
@@ -1814,7 +1814,7 @@ class AboutScreen(Screen):
 # ----------------------------------------------------------------------
 MENU_ITEMS = [
     ("Конвертация и погрешность", ConvScreen),
-    ("4–20 мА ⇄ Величина", MaScreen),
+    ("4–20 мА → Величина", MaScreen),
     ("Диагностика датчика", DiagScreen),
     ("Расход (квадратичная)", FlowScreen),
     ("Расход (диафрагма)", OrifScreen),

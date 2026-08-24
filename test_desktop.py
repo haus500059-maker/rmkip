@@ -59,8 +59,8 @@ def drive(dt):
         check("conv 1(2)MPa->kPa value", "2000.000000" in r, r)
         check("conv rel error 2.5%", "2.50%" in r, r)
 
-        # ---------- 2. 4–20 мА ⇄ Величина ----------
-        s = sm.get_screen("scr_4–20 мА ⇄ Величина")
+        # ---------- 2. 4–20 мА → Величина ----------
+        s = sm.get_screen("scr_4–20 мА → Величина")
         s.e_ma_min.text = "4"
         s.e_ma_max.text = "20"
         s.e_val_min.text = "0"
