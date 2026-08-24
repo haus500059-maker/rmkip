@@ -1713,8 +1713,8 @@ class MaScreen(Screen):
 
     def toggle_dir(self, *_):
         self._ma2val = not self._ma2val
-        self.btn_dir.text = ("Направление: Величина / мА"
-                             if self._ma2val else "Направление: мА / Величина")
+        self.btn_dir.text = ("Направление: мА / Величина"
+                             if self._ma2val else "Направление: Величина / мА")
         self.btn_dir.background_color = SUCCESS if not self._ma2val else SPIN_BG
         self.btn_dir.color = (1, 1, 1, 1) if not self._ma2val else TEXT
 
