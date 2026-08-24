@@ -26,7 +26,7 @@ DESIGN_WIDTH_DP = 360.0
 
 
 def sc(v):
-    """dp → px с учётом реальной ширины экрана (резиновая вёрстка)."""
+    """dp / px с учётом реальной ширины экрана (резиновая вёрстка)."""
     try:
         w = Window.width
     except Exception:
@@ -1530,7 +1530,7 @@ class CondScreen(Screen):
                 l2 = core.cond_line_geometry(L2, slope2, fill2, d_in, t_c)
                 dh_mm = abs(l1["h_mm"] - l2["h_mm"])
                 dp_eff_pa = dh_mm / 1000.0 * l1["rho"] * core.GRAVITY_M_S2
-                lines.append(f"Δh = |h1 − h2| = {dh_mm:.1f} мм  →  ΔP = "
+                lines.append(f"Δh = |h1 − h2| = {dh_mm:.1f} мм  /  ΔP = "
                              f"{dp_eff_pa:.0f} Па ≈ {dp_eff_pa / 9.80665:.1f} мм вод. ст.")
 
             Q = self._num_or(self.e_q, 0.0)
@@ -1614,7 +1614,7 @@ class CondScreen(Screen):
 
 
 # ----------------------------------------------------------------------
-# ЭКРАН 8. 4–20 мА → Величина
+# ЭКРАН 8. 4–20 мА / Величина
 # ----------------------------------------------------------------------
 MA_UNITS = ["бар", "кПа", "МПа", "мбар", "атм", "пси",
             "°C", "°F", "K",
@@ -1658,7 +1658,7 @@ class MaScreen(Screen):
         super().__init__(**kw)
         content = new_scroll()
 
-        heading(content, "4–20 мА → Величина")
+        heading(content, "4–20 мА / Величина")
         content.add_widget(make_label(
             "Универсальный пересчёт сигнала 4–20 мА в физическую величину и обратно.",
             size=14, color=MUTED, height=56))
@@ -1667,7 +1667,7 @@ class MaScreen(Screen):
         field(content, "Типовой прибор:", self.s_preset)
         self.s_preset.bind(text=self.on_preset)
 
-        self.btn_dir = make_button("Направление: мА → Величина",
+        self.btn_dir = make_button("Направление: мА / Величина",
                                    self.toggle_dir, bg=SPIN_BG, fg=TEXT, height=48)
         content.add_widget(self.btn_dir)
         self._ma2val = True
@@ -1699,7 +1699,7 @@ class MaScreen(Screen):
         content.add_widget(make_button("Копировать результат", lambda *_: copy_result(self.l_res),
                                        bg=(0.42, 0.447, 0.502, 1), height=46))
 
-        wrap_screen(self, "4–20 мА → Величина", content)
+        wrap_screen(self, "4–20 мА / Величина", content)
 
     def on_preset(self, *_):
         name = self.s_preset.text
@@ -1713,8 +1713,8 @@ class MaScreen(Screen):
 
     def toggle_dir(self, *_):
         self._ma2val = not self._ma2val
-        self.btn_dir.text = ("Направление: Величина → мА"
-                             if self._ma2val else "Направление: мА → Величина")
+        self.btn_dir.text = ("Направление: Величина / мА"
+                             if self._ma2val else "Направление: мА / Величина")
         self.btn_dir.background_color = SUCCESS if not self._ma2val else SPIN_BG
         self.btn_dir.color = (1, 1, 1, 1) if not self._ma2val else TEXT
 
@@ -1814,7 +1814,7 @@ class AboutScreen(Screen):
 # ----------------------------------------------------------------------
 MENU_ITEMS = [
     ("Конвертация и погрешность", ConvScreen),
-    ("4–20 мА → Величина", MaScreen),
+    ("4–20 мА / Величина", MaScreen),
     ("Диагностика датчика", DiagScreen),
     ("Расход (квадратичная)", FlowScreen),
     ("Расход (диафрагма)", OrifScreen),

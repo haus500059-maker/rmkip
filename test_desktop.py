@@ -59,8 +59,8 @@ def drive(dt):
         check("conv 1(2)MPa->kPa value", "2000.000000" in r, r)
         check("conv rel error 2.5%", "2.50%" in r, r)
 
-        # ---------- 2. 4–20 мА → Величина ----------
-        s = sm.get_screen("scr_4–20 мА → Величина")
+        # ---------- 2. 4–20 мА / Величина ----------
+        s = sm.get_screen("scr_4–20 мА / Величина")
         s.e_ma_min.text = "4"
         s.e_ma_max.text = "20"
         s.e_val_min.text = "0"
@@ -71,7 +71,7 @@ def drive(dt):
         r = s.l_res.text
         check("ma2val 12mA=5bar", "5.000" in r and "бар" in r, r)
         check("ma2val 50%", "50.0%" in r, r)
-        # направление: Величина → мА
+        # направление: Величина / мА
         s.toggle_dir()
         s.e_input.text = "5"
         s.on_calc()
@@ -89,7 +89,7 @@ def drive(dt):
         s.e_val_min.text = "0"
         s.e_val_max.text = "10"
         s._ma2val = True
-        s.btn_dir.text = "Направление: мА → Величина"
+        s.btn_dir.text = "Направление: мА / Величина"
         s.e_input.text = "25"
         s.on_calc()
         r = s.l_res.text
