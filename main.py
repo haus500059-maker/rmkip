@@ -1536,9 +1536,10 @@ class CondScreen(Screen):
             Q = self._num_or(self.e_q, 0.0)
             if self._fast:
                 t_cool_h = max(0.1, self._num_or(self.e_cool, 2.0))
-                lines.append(f"\nВремя до полного заполнения: ~{t_cool_h:g} ч "
-                             f"(равно времени остывания; Q не используется)")
-                t_full_h = t_cool_h
+                # Время пропорционально объёму: эталон 500 мл
+                t_full_h = t_cool_h * (l1["V_ml"] / 500.0)
+                lines.append(f"\nВремя до полного заполнения: ~{t_full_h:.1f} ч "
+                             f"(при эталонном объёме 500 мл; Q не используется)")
             elif Q > 0:
                 lines.append(f"\nВремя до полного заполнения: {l1['V_ml'] / Q:.0f} ч"
                              f" (до текущего: {l1['V_cond'] / Q:.0f} ч)")
