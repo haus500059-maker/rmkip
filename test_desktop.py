@@ -94,6 +94,25 @@ def drive(dt):
         s.on_calc()
         r = s.l_res.text
         check("ma2val out of range", "ВНЕ ДИАПАЗОНА" in r, r)
+        # инверсный сигнал 20–4 мА
+        s.e_ma_min.text = "20"
+        s.e_ma_max.text = "4"
+        s.e_input.text = "12"
+        s.on_calc()
+        r = s.l_res.text
+        check("inv 12mA=5bar", "5.000" in r and "50.0%" in r, r)
+        s.e_input.text = "20"
+        s.on_calc()
+        r = s.l_res.text
+        check("inv 20mA=0bar 0%", "0.000" in r and "-0.0" not in r and "0.0%" in r, r)
+        s.e_input.text = "2"
+        s.on_calc()
+        check("inv out of range", "ВНЕ ДИАПАЗОНА" in s.l_res.text, s.l_res.text)
+        # инверсный пресет
+        s.s_preset.text = "Давление 0–10 бар (инверсный)"
+        s.on_preset()
+        check("preset inv ma 20-4", s.e_ma_min.text == "20" and s.e_ma_max.text == "4",
+              (s.e_ma_min.text, s.e_ma_max.text))
 
         # ---------- 3. Расход ----------
         s = sm.get_screen("scr_Расход (квадратичная)")
@@ -273,9 +292,11 @@ def drive(dt):
         check("about 10 features", "4–20 мА" in s.l_about_2.text and "импульсные" in s.l_about_2.text.lower(), s.l_about_2.text)
         check("about author+python+year", "Python" in s.l_about_3.text, s.l_about_3.text)
         check("about copyright", hasattr(s, "l_cr") and "Харлин" in s.l_cr.text, getattr(s, "l_cr", None))
-        check("about new in 1.2", hasattr(s, "l_about_new") and "1.2" in s.l_about_new.text
-              and "конденсат" in s.l_about_new.text and "4–20 мА" in s.l_about_new.text,
+        check("about new in 1.3", hasattr(s, "l_about_new") and "инверсн" in s.l_about_new.text
+              and "4–20 мА" in s.l_about_new.text,
               getattr(s, "l_about_new", None))
+        check("about version label 1.3", hasattr(s, "l_ver") and "1.3" in s.l_ver.text,
+              getattr(s, "l_ver", None))
 
         # ---------- 8.1 Импульсные линии и конденсат ----------
         s = sm.get_screen("scr_Импульсные линии (конденсат)")
