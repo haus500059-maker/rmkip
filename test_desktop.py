@@ -298,6 +298,18 @@ def drive(dt):
         check("about version label 1.3", hasattr(s, "l_ver") and "1.3" in s.l_ver.text,
               getattr(s, "l_ver", None))
 
+        # ---------- 8.2 Главное меню: дата и время ----------
+        m = sm.get_screen("menu")
+        check("menu datetime label", hasattr(m, "l_dt"), getattr(m, "l_dt", None))
+        m._update_dt()
+        import re as _re
+        _pat = _re.compile(r"\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}")
+        check("menu datetime format", bool(_pat.match(m.l_dt.text or "")), m.l_dt.text)
+        # переключение экранов не ломает расписание
+        sm.current = "scr_О программе"
+        sm.current = "menu"
+        check("menu datetime after nav", bool(_pat.match(m.l_dt.text or "")), m.l_dt.text)
+
         # ---------- 8.1 Импульсные линии и конденсат ----------
         s = sm.get_screen("scr_Импульсные линии (конденсат)")
         # база: 10 м, 14×2 (d=10), уклон 5‰, заполнение 50%, 20°C

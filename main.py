@@ -5,6 +5,7 @@
 термопары НСХ, расход через диафрагму (ГОСТ 8.586.2 / ISO 5167).
 """
 import math
+from datetime import datetime
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
@@ -18,6 +19,7 @@ from kivy.uix.spinner import Spinner
 from kivy.uix.popup import Popup
 from kivy.core.clipboard import Clipboard
 from kivy.core.window import Window
+from kivy.clock import Clock
 
 import core
 
@@ -1851,6 +1853,11 @@ class MenuScreen(Screen):
                      size=(sc(160), sc(160)))
         logo.pos_hint = {"center_x": 0.5}
         content.add_widget(logo)
+        # Дата и время (обновляются каждую секунду, пока открыт главный экран)
+        self.l_dt = make_label("", size=15, color=MUTED, halign="center")
+        self.l_dt.bold = True
+        self._update_dt()
+        content.add_widget(self.l_dt)
         content.add_widget(make_label("Выберите раздел:", size=16, color=MUTED))
         for name, _cls in MENU_ITEMS:
             b = make_button(name, bg=PRIMARY, height=58)
@@ -1859,6 +1866,16 @@ class MenuScreen(Screen):
         outer.add_widget(as_scroll(content))
         add_safe_spacers(outer, top=False, bottom=True)
         self.add_widget(outer)
+
+    def _update_dt(self, *_):
+        self.l_dt.text = datetime.now().strftime("%d.%m.%Y, %H:%M:%S")
+
+    def on_pre_enter(self, *_):
+        self._update_dt()
+        Clock.schedule_interval(self._update_dt, 1)
+
+    def on_pre_leave(self, *_):
+        Clock.unschedule(self._update_dt)
 
     def goto(self, name):
         for n, _cls in MENU_ITEMS:
